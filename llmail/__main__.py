@@ -18,6 +18,7 @@ class EmailThread:
     def __repr__(self):
         return f"EmailThread(initial_email={self.initial_email}, replies={self.replies})"
 
+
 class Email:
     def __init__(self, imap_id, message_id, subject, sender, date, body):
         self.imap_id = imap_id
@@ -30,11 +31,13 @@ class Email:
     def __repr__(self):
         return f"Email(imap_id={self.imap_id}, message_id={self.message_id}, subject={self.subject}, sender={self.sender}, date={self.date})"
 
+
 args = None
 bot_email = None
 
+
 def main():
-    '''Main entry point for the script.'''
+    """Main entry point for the script."""
     global args
     global bot_email
     args = argparser.parse_args()
@@ -45,26 +48,28 @@ def main():
     set_primary_logger(args.log_level)
     ic(args)
     fetch_and_process_emails()
+
+
 def fetch_and_process_emails():
-    '''Fetch and process emails from the IMAP server.'''
+    """Fetch and process emails from the IMAP server."""
     with IMAPClient(args.imap_host) as client:
         client.login(args.imap_username, args.imap_password)
         client.select_folder("INBOX")
 
         password_subject = f"autoreply password"
-        messages = client.search(['SUBJECT', password_subject])
+        messages = client.search(["SUBJECT", password_subject])
 
         email_threads = {}
 
         for msg_id in messages:
-            msg_data = client.fetch([msg_id], ['ENVELOPE', 'BODY[]', 'RFC822.HEADER'])
-            envelope = msg_data[msg_id][b'ENVELOPE']
+            msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
+            envelope = msg_data[msg_id][b"ENVELOPE"]
             subject = envelope.subject.decode()
             sender = envelope.sender[0].mailbox.decode() + "@" + envelope.sender[0].host.decode()
             date = envelope.date
-            headers_bytes = msg_data[msg_id][b'RFC822.HEADER']
-            headers_str = headers_bytes.decode('utf-8')  # Assuming UTF-8 encoding
-            headers_list = [line.split(': ', 1) for line in headers_str.split('\r\n') if ': ' in line]
+            headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
+            headers_str = headers_bytes.decode("utf-8")  # Assuming UTF-8 encoding
+            headers_list = [line.split(": ", 1) for line in headers_str.split("\r\n") if ": " in line]
             headers = {key.strip(): value.strip() for key, value in headers_list}
 
             # Extract the Message-ID header
@@ -79,25 +84,29 @@ def fetch_and_process_emails():
 
                 if parent_email_id in email_threads:
                     # Add the reply to the existing thread
-                    email_threads[parent_email_id].add_reply(Email(
-                        imap_id=msg_id,
-                        message_id=message_id,
-                        subject=subject,
-                        sender=sender,
-                        date=date,
-                        body=msg_data[msg_id][b'BODY[]']
-                    ))
+                    email_threads[parent_email_id].add_reply(
+                        Email(
+                            imap_id=msg_id,
+                            message_id=message_id,
+                            subject=subject,
+                            sender=sender,
+                            date=date,
+                            body=msg_data[msg_id][b"BODY[]"],
+                        )
+                    )
                     logger.debug(f"Added message {message_id} to existing thread for email {parent_email_id}")
                 else:
                     # Create a new thread for the email
-                    email_thread = EmailThread(Email(
-                        imap_id=msg_id,
-                        message_id=message_id,
-                        subject=subject,
-                        sender=sender,
-                        date=date,
-                        body=msg_data[msg_id][b'BODY[]']
-                    ))
+                    email_thread = EmailThread(
+                        Email(
+                            imap_id=msg_id,
+                            message_id=message_id,
+                            subject=subject,
+                            sender=sender,
+                            date=date,
+                            body=msg_data[msg_id][b"BODY[]"],
+                        )
+                    )
                     email_threads[parent_email_id] = email_thread
                     logger.info(f"Created new thread for email {message_id} sent at {date}")
 
@@ -109,29 +118,31 @@ def fetch_and_process_emails():
     ic([thread for thread in email_threads.values()])
     logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
+
 # Function to check if an email has been read
 def is_new_email(client, msg_id):
     flags = client.get_flags([msg_id])
-    return b'\\Seen' not in flags.get(msg_id, [])
+    return b"\\Seen" not in flags.get(msg_id, [])
 
 
 def is_most_recent_user_email(client, msg_id, sender):
     # Fetch the header of the email to get the "In-Reply-To" header
-    msg_data = client.fetch([msg_id], ['RFC822.HEADER'])
-    headers_bytes = msg_data[msg_id][b'RFC822.HEADER']
+    msg_data = client.fetch([msg_id], ["RFC822.HEADER"])
+    headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
     headers_str = headers_bytes.decode()
     headers = dict(header.split(": ", 1) for header in headers_str.split("\r\n") if ": " in header)
     timestamp = headers.get("Date")
     logger.debug(f"Checking if email {msg_id} from {sender} sent on {timestamp} is most recent user email")
     return sender != bot_email
 
+
 def get_top_level_email(client, msg_id, message_id=None):
-    '''Get the top-level email in the thread for the specified message ID (IMAP)'''
+    """Get the top-level email in the thread for the specified message ID (IMAP)"""
     message_id = msg_id if message_id is None else message_id
-    msg_data = client.fetch([msg_id], ['RFC822.HEADER'])
-    headers_bytes = msg_data[msg_id][b'RFC822.HEADER']
+    msg_data = client.fetch([msg_id], ["RFC822.HEADER"])
+    headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
     headers_str = headers_bytes.decode()
-    headers_list = [line.split(': ', 1) for line in headers_str.split('\r\n') if ': ' in line]
+    headers_list = [line.split(": ", 1) for line in headers_str.split("\r\n") if ": " in line]
     headers = {key.strip(): value.strip() for key, value in headers_list}
 
     # Extract the References header and split it into individual message IDs
@@ -145,7 +156,7 @@ def get_top_level_email(client, msg_id, message_id=None):
 
 
 def set_primary_logger(log_level):
-    '''Set up the primary logger with the specified log level. Output to stderr and use the format specified.'''
+    """Set up the primary logger with the specified log level. Output to stderr and use the format specified."""
     logger.remove()
     # ^10 is a formatting directive to center with a padding of 10
     logger_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> |<level>{level: ^10}</level>| <level>{message}</level>"
@@ -153,10 +164,11 @@ def set_primary_logger(log_level):
 
 
 def send_reply(client, msg_id, message_id=None):
-    '''Send a reply to the email with the specified message ID.'''
+    """Send a reply to the email with the specified message ID."""
     message_id = msg_id if message_id is None else message_id
     logger.debug(f"Sending reply to email {message_id}")
     logger.error("Replying not implemented yet")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
