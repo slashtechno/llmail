@@ -108,7 +108,7 @@ def fetch_and_process_emails():
 
 
 # Function to check if an email has been read
-def isNewEmail(client, msg_id):
+def is_new_email(client, msg_id):
     flags = client.get_flags([msg_id])
     return b'\\Seen' not in flags.get(msg_id, [])
 
