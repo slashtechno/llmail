@@ -1,5 +1,6 @@
+from email import message_from_bytes
 from sys import stderr
-
+import yagmail
 from icecream import ic
 from imapclient import IMAPClient
 from loguru import logger
@@ -67,19 +68,17 @@ def fetch_and_process_emails():
             subject = envelope.subject.decode()
             sender = envelope.sender[0].mailbox.decode() + "@" + envelope.sender[0].host.decode()
             date = envelope.date
-            headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
-            headers_str = headers_bytes.decode("utf-8")  # Assuming UTF-8 encoding
-            headers_list = [line.split(": ", 1) for line in headers_str.split("\r\n") if ": " in line]
-            headers = {key.strip(): value.strip() for key, value in headers_list}
-
+            # Parse the headers from the email data
+            message = message_from_bytes(msg_data[msg_id][b"RFC822.HEADER"])
+            headers = dict(message.items())
             # Extract the Message-ID header
             message_id_header = headers.get("Message-ID")
-            # No need to decode the message ID header since it's already a string
+            # If the Message-ID header doesn't exist, fallback to the IMAP message ID
             message_id = message_id_header if message_id_header else msg_id
 
             # Check if the email is new (not replied to by the bot yet)
             if is_most_recent_user_email(client, msg_id, sender):
-                # Put this as message_id so the key for email_threads is the top-level email
+                # Put this as message_id so the key for email_threads is the top-level if this email is top-level
                 parent_email_id = get_top_level_email(client, msg_id, message_id)
 
                 if parent_email_id in email_threads:
@@ -129,8 +128,7 @@ def is_most_recent_user_email(client, msg_id, sender):
     # Fetch the header of the email to get the "In-Reply-To" header
     msg_data = client.fetch([msg_id], ["RFC822.HEADER"])
     headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
-    headers_str = headers_bytes.decode()
-    headers = dict(header.split(": ", 1) for header in headers_str.split("\r\n") if ": " in header)
+    headers = message_from_bytes(headers_bytes)
     timestamp = headers.get("Date")
     logger.debug(f"Checking if email {msg_id} from {sender} sent on {timestamp} is most recent user email")
     return sender != bot_email
@@ -141,13 +139,14 @@ def get_top_level_email(client, msg_id, message_id=None):
     message_id = msg_id if message_id is None else message_id
     msg_data = client.fetch([msg_id], ["RFC822.HEADER"])
     headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
-    headers_str = headers_bytes.decode()
-    headers_list = [line.split(": ", 1) for line in headers_str.split("\r\n") if ": " in line]
-    headers = {key.strip(): value.strip() for key, value in headers_list}
+
+    # Parse the headers using the email library
+    msg = message_from_bytes(headers_bytes)
+    headers = dict(msg.items())
 
     # Extract the References header and split it into individual message IDs
     references_header = headers.get("References", "")
-    references_ids = [msg_id.strip() for msg_id in references_header.split() if msg_id.strip()]
+    references_ids = [m_id.strip() for m_id in references_header.split() if m_id.strip()]
 
     # Extract the first message ID, which represents the top-level email in the thread
     # If it doesn't exist, use the current message ID. Not msg_id since msg_id is only for IMAP
@@ -165,9 +164,9 @@ def set_primary_logger(log_level):
 
 def send_reply(client, msg_id, message_id=None):
     """Send a reply to the email with the specified message ID."""
-    message_id = msg_id if message_id is None else message_id
+    # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.debug(f"Sending reply to email {message_id}")
-    logger.error("Replying not implemented yet")
+    logger.error("Sending replies is not implemented yet.")
 
 
 if __name__ == "__main__":

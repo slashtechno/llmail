@@ -12,6 +12,7 @@ loguru = "^0.7.2"
 python-dotenv = "^1.0.1"
 imapclient = "^3.0.1"
 icecream = "^2.1.3"
+yagmail = {extras = ["all"], version = "^0.15.293"}
 
 
 [tool.poetry.group.dev.dependencies]
