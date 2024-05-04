@@ -4,6 +4,7 @@ import yagmail
 from icecream import ic
 from imapclient import IMAPClient
 from loguru import logger
+from email.utils import getaddresses
 
 from llmail.utils.cli_args import argparser
 
@@ -109,13 +110,13 @@ def fetch_and_process_emails():
                     email_threads[parent_email_id] = email_thread
                     logger.info(f"Created new thread for email {message_id} sent at {date}")
 
-    # Send replies outside of the loop
-    for email_thread in email_threads.values():
-        most_recent_imap_id = email_thread.replies[-1].imap_id
-        most_recent_message_id = email_thread.replies[-1].message_id
-        send_reply(client, most_recent_imap_id, most_recent_message_id)
-    ic([thread for thread in email_threads.values()])
-    logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
+        # Send replies outside of the loop
+        for email_thread in email_threads.values():
+            most_recent_imap_id = email_thread.replies[-1].imap_id
+            most_recent_message_id = email_thread.replies[-1].message_id
+            send_reply(client, most_recent_imap_id, most_recent_message_id)
+        ic([thread for thread in email_threads.values()])
+        logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
 
 # Function to check if an email has been read
@@ -133,6 +134,38 @@ def is_most_recent_user_email(client, msg_id, sender):
     logger.debug(f"Checking if email {msg_id} from {sender} sent on {timestamp} is most recent user email")
     return sender != bot_email
 
+
+
+def get_thread_history(client, msg_id):
+    '''Fetch the entire thread history for the specified message ID.'''
+    thread_history = []
+    msg_data = client.fetch([msg_id], ['RFC822'])
+    raw_message = msg_data[msg_id][b'RFC822']
+    message = message_from_bytes(raw_message)
+    thread_history.append({
+        'sender': get_sender(message),
+        'content': message.get_payload(decode=True)
+    })
+
+    # Fetch previous emails in the thread if available
+    while message.get('In-Reply-To'):
+        prev_message_id = message.get('In-Reply-To')
+        prev_msg_data = client.fetch([get_uid_from_message_id(client, prev_message_id)], ['RFC822'])
+        prev_raw_message = prev_msg_data[prev_message_id][b'RFC822']
+        prev_message = message_from_bytes(prev_raw_message)
+        thread_history.append({
+        'sender': get_sender(message),
+        'content': message.get_payload(decode=True)
+    })
+        message = prev_message
+
+    return thread_history
+
+def get_sender(message):
+    '''Extract the sender information from an email message.'''
+    sender = message.get('From', '')
+    sender_name, sender_email = getaddresses([sender])[0]
+    return {'name': sender_name, 'email': sender_email}
 
 def get_top_level_email(client, msg_id, message_id=None):
     """Get the top-level email in the thread for the specified message ID (IMAP)"""
@@ -153,6 +186,26 @@ def get_top_level_email(client, msg_id, message_id=None):
     top_level_email_id = references_ids[0] if references_ids else message_id
     return top_level_email_id
 
+def get_uid_from_message_id(imap_client, message_id):
+    """Get the UID of a message using its Message-ID."""
+    search_result = imap_client.search(['HEADER', 'Message-ID', message_id])
+    if search_result:
+        logger.debug(f"UIDs: {search_result}")
+        uid = search_result[0]  # Assuming search_result is a list of UIDs
+        logger.info(f"UID of message with Message-ID {message_id} is {uid}")
+        return uid
+    else:
+        logger.warning(f"UID of message with Message-ID {message_id} not found. Trying to check all headers and text.")
+        # If the Message-ID header is not found, search all headers
+        search_result = imap_client.search(['HEADER', 'TEXT', message_id])
+        if search_result:
+            logger.debug(f"UIDs: {search_result}")
+            uid = search_result[0]
+            logger.info(f"UID of message with Message-ID {message_id} is {uid}")
+            return uid
+        else:
+            logger.error(f"UID of message with Message-ID {message_id} not found in any headers.")
+            return None  # Message not found or UID not available
 
 def set_primary_logger(log_level):
     """Set up the primary logger with the specified log level. Output to stderr and use the format specified."""
@@ -167,7 +220,7 @@ def send_reply(client, msg_id, message_id=None):
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.debug(f"Sending reply to email {message_id}")
     logger.error("Sending replies is not implemented yet.")
-
+    thread = get_thread_history(client, msg_id)
 
 if __name__ == "__main__":
     main()
