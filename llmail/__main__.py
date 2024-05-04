@@ -87,7 +87,7 @@ def fetch_and_process_emails():
                         date=date,
                         body=msg_data[msg_id][b'BODY[]']
                     ))
-                    logger.info(f"Added reply to thread {parent_email_id}")
+                    logger.debug(f"Added message {message_id} to existing thread for email {parent_email_id}")
                 else:
                     # Create a new thread for the email
                     email_thread = EmailThread(Email(
@@ -101,11 +101,13 @@ def fetch_and_process_emails():
                     email_threads[parent_email_id] = email_thread
                     logger.info(f"Created new thread for email {message_id} sent at {date}")
 
-                # Send reply if the most recent email in the thread is from the user (not the bot)
-                if sender != bot_email:
-                    send_reply(client, msg_id)
+    # Send replies outside of the loop
+    for email_thread in email_threads.values():
+        most_recent_imap_id = email_thread.replies[-1].imap_id
+        most_recent_message_id = email_thread.replies[-1].message_id
+        send_reply(client, most_recent_imap_id, most_recent_message_id)
     ic([thread for thread in email_threads.values()])
-
+    logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
 # Function to check if an email has been read
 def is_new_email(client, msg_id):
@@ -120,7 +122,7 @@ def is_most_recent_user_email(client, msg_id, sender):
     headers_str = headers_bytes.decode()
     headers = dict(header.split(": ", 1) for header in headers_str.split("\r\n") if ": " in header)
     timestamp = headers.get("Date")
-    # logger.info(f"Checking email {msg_id} from {sender}. Date: {timestamp}")
+    logger.debug(f"Checking if email {msg_id} from {sender} sent on {timestamp} is most recent user email")
     return sender != bot_email
 
 def get_top_level_email(client, msg_id, message_id=None):
@@ -150,9 +152,11 @@ def set_primary_logger(log_level):
     logger.add(stderr, format=logger_format, colorize=True, level=log_level)
 
 
-def send_reply(client, msg_id):
+def send_reply(client, msg_id, message_id=None):
     '''Send a reply to the email with the specified message ID.'''
-    logger.info("Replying not implemented yet")
+    message_id = msg_id if message_id is None else message_id
+    logger.debug(f"Sending reply to email {message_id}")
+    logger.error("Replying not implemented yet")
 
 if __name__ == '__main__':
     main()
