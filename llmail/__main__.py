@@ -1,8 +1,11 @@
 from email import message_from_bytes
+from email.message import Message
 from sys import stderr
 import yagmail
+import html2text
 from icecream import ic
 from imapclient import IMAPClient
+import imaplib
 from loguru import logger
 from email.utils import getaddresses
 
@@ -57,7 +60,7 @@ def fetch_and_process_emails():
     with IMAPClient(args.imap_host) as client:
         client.login(args.imap_username, args.imap_password)
         client.select_folder("INBOX")
-
+        logger.debug(f"All folders: {client.list_folders()}")
         password_subject = f"autoreply password"
         messages = client.search(["SUBJECT", password_subject])
 
@@ -144,18 +147,19 @@ def get_thread_history(client, msg_id):
     message = message_from_bytes(raw_message)
     thread_history.append({
         'sender': get_sender(message),
-        'content': message.get_payload(decode=True)
+        'content': get_plain_email_content(message)
     })
 
     # Fetch previous emails in the thread if available
     while message.get('In-Reply-To'):
         prev_message_id = message.get('In-Reply-To')
-        prev_msg_data = client.fetch([get_uid_from_message_id(client, prev_message_id)], ['RFC822'])
-        prev_raw_message = prev_msg_data[prev_message_id][b'RFC822']
+        prev_msg_id = get_uid_from_message_id(client, prev_message_id)
+        prev_msg_data = client.fetch([prev_msg_id], ['RFC822'])
+        prev_raw_message = prev_msg_data[prev_msg_id][b'RFC822']
         prev_message = message_from_bytes(prev_raw_message)
         thread_history.append({
         'sender': get_sender(message),
-        'content': message.get_payload(decode=True)
+        'content': get_plain_email_content(message)
     })
         message = prev_message
 
@@ -188,24 +192,22 @@ def get_top_level_email(client, msg_id, message_id=None):
 
 def get_uid_from_message_id(imap_client, message_id):
     """Get the UID of a message using its Message-ID."""
-    search_result = imap_client.search(['HEADER', 'Message-ID', message_id])
-    if search_result:
-        logger.debug(f"UIDs: {search_result}")
-        uid = search_result[0]  # Assuming search_result is a list of UIDs
-        logger.info(f"UID of message with Message-ID {message_id} is {uid}")
-        return uid
-    else:
-        logger.warning(f"UID of message with Message-ID {message_id} not found. Trying to check all headers and text.")
-        # If the Message-ID header is not found, search all headers
-        search_result = imap_client.search(['HEADER', 'TEXT', message_id])
+    # In some cases, it might not be in Inbox
+    # For example, for me, I think when the bot sends an email it was in [Gmail]/All Mail
+    for folder in imap_client.list_folders():
+        try:
+            imap_client.select_folder(folder[2])
+        # If the error is imaplib.IMAP4.error: select failed:...
+        except imaplib.IMAP4.error:
+            logger.info(f"Failed to select folder {folder[2]}. Skipping...")
+            continue
+        search_result = imap_client.search(['HEADER', 'Message-ID', message_id])
         if search_result:
-            logger.debug(f"UIDs: {search_result}")
-            uid = search_result[0]
-            logger.info(f"UID of message with Message-ID {message_id} is {uid}")
+            uid = search_result[0]  # Assuming search_result is a list of UIDs
+            logger.info(f"UID of message with Message-ID {message_id} is {uid}. Email subject: {imap_client.fetch([uid], ['ENVELOPE'])[uid][b'ENVELOPE'].subject}")
             return uid
-        else:
-            logger.error(f"UID of message with Message-ID {message_id} not found in any headers.")
-            return None  # Message not found or UID not available
+    logger.warning(f"UID of message with Message-ID {message_id} not found. Trying to check all headers and text.")
+    return None
 
 def set_primary_logger(log_level):
     """Set up the primary logger with the specified log level. Output to stderr and use the format specified."""
@@ -221,6 +223,26 @@ def send_reply(client, msg_id, message_id=None):
     logger.debug(f"Sending reply to email {message_id}")
     logger.error("Sending replies is not implemented yet.")
     thread = get_thread_history(client, msg_id)
+    logger.debug(f"Thread history: {thread}")
+
+def get_plain_email_content(message: Message) -> str:
+    """Get the content of the email message."""
+    if message.is_multipart():
+        for part in message.walk():
+            content_type = part.get_content_type()
+            try:
+                body = part.get_payload(decode=True)
+            except UnicodeDecodeError:
+                logger.debug("UnicodeDecodeError occurred. Trying to get payload as string.")
+                body = str(part.get_payload())
+            if content_type == "text/plain":
+                markdown = html2text.html2text(str(body.decode('unicode_escape'))).strip()
+                logger.debug(f"Converted to markdown: {markdown}")
+                return markdown
+    else:
+        logger.debug(f"Message is not multipart. Getting payload as string.")
+        body = message.get_payload(decode=True).decode()
+        return html2text.html2text(str(body.decode('unicode_escape')))
 
 if __name__ == "__main__":
     main()
