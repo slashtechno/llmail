@@ -9,7 +9,7 @@ Interact with Large Language Models (LLMs) via email.
 ## Prerequisites  
 ### Python  
 - Python ^3.11
-- Poetry <!-- (optional)  -->
+- Poetry (optional) 
 - An API key from an OpenAI-compatible API
     - At the time of writing, [OpenRouter](https://openrouter.ai/docs#models) provides free access to select models
         - Right now, they are the only provider that will work due to the model being hard-coded (for now)
@@ -21,12 +21,12 @@ Cloning the repository is not required when installing from PyPi but is required
 2. `cd` into the cloned repository  
 3. Install with [Poetry](https://python-poetry.org/) <!-- or [Docker](https://www.docker.com/) -->
 
-<!-- 
+
 #### Installing from PyPi with pip (recommended)  
 This assumes you have the correct version of Python installed
 1. `pip install llmail`  
     a. You may need to use `pip3` instead of `pip`  
-2. `llmail`   -->
+2. `llmail`  
 
 #### Poetry  
 1. `poetry install`  
