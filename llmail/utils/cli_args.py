@@ -42,7 +42,9 @@ def set_argparse():
     )
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
-    ai_api.add_argument("--openai-api-key", help="OpenAI API key", default=os.getenv("OPENAI_API_KEY"))
+    ai_api.add_argument(
+        "--openai-api-key", help="OpenAI API key", default=os.getenv("OPENAI_API_KEY")
+    )
     ai_api.add_argument(
         "--openai-base-url",
         help="OpenAI API endpoint",
@@ -77,8 +79,21 @@ def set_argparse():
         default=os.getenv("SMTP_PASSWORD"),
     )
 
-    check_required_args(["imap_host", "imap_port", "imap_username", "imap_password", "smtp_host", "smtp_port", "smtp_username", "smtp_password",
-                         "openai_api_key", "openai_base_url"], argparser)
+    check_required_args(
+        [
+            "imap_host",
+            "imap_port",
+            "imap_username",
+            "imap_password",
+            "smtp_host",
+            "smtp_port",
+            "smtp_username",
+            "smtp_password",
+            "openai_api_key",
+            "openai_base_url",
+        ],
+        argparser,
+    )
 
 
 def check_required_args(required_args: list[str], argparser: argparse.ArgumentParser):
