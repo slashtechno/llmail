@@ -83,6 +83,7 @@ def main():
 def fetch_and_process_emails():
     """Fetch and process emails from the IMAP server."""
     global email_threads
+    openai = OpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
     with IMAPClient(args.imap_host) as client:
         client.login(args.imap_username, args.imap_password)
         password_subject = "autoreply password"
@@ -163,16 +164,23 @@ def fetch_and_process_emails():
         # Send replies outside of the loop
         for email_thread in email_threads.values():
             # Check if the most recent email in the thread is from the user
-            try: 
+            try:
                 if email_thread.replies[-1].sender != bot_email:
                     most_recent_imap_id = email_thread.replies[-1].imap_id
                     most_recent_message_id = email_thread.replies[-1].message_id
-                    send_reply(client, most_recent_imap_id, most_recent_message_id)
+                    send_reply(openai, client, most_recent_imap_id, most_recent_message_id)
                 else:
-                    logger.debug(f"Most recent email in thread {email_thread} is from the bot. Skipping...")
+                    logger.debug(
+                        f"Most recent email in thread {email_thread} is from the bot. Skipping..."
+                    )
             except IndexError:
                 logger.debug(f"No replies in thread {email_thread}. Replying to initial email.")
-                send_reply(client, email_thread.initial_email.imap_id, email_thread.initial_email.message_id)
+                send_reply(
+                    openai,
+                    client,
+                    email_thread.initial_email.imap_id,
+                    email_thread.initial_email.message_id,
+                )
         ic([thread for thread in email_threads.values()])
         logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
@@ -201,7 +209,9 @@ def get_thread_history(
     """Fetch the entire thread history for the specified message ID."""
 
     if isinstance(message_identifier, EmailThread):
-        logger.warning("Getting thread history from EmailThread object. If EmailThread does not include sent emails (not just INBOX fetched) this will exclude the bot's replies.") # noqa E501
+        logger.warning(
+            "Getting thread history from EmailThread object. If EmailThread does not include sent emails (not just INBOX fetched) this will exclude the bot's replies."
+        )  # noqa E501
         thread_history = []
         thread_history.append(
             {
@@ -242,7 +252,7 @@ def get_thread_history(
             {
                 "sender": get_sender(message)["email"],
                 "content": get_plain_email_content(message),
-                "timestamp":  parsedate_to_datetime(message.get("Date")),
+                "timestamp": parsedate_to_datetime(message.get("Date")),
             }
         )
 
@@ -257,7 +267,7 @@ def get_thread_history(
                 {
                     "sender": get_sender(message),
                     "content": get_plain_email_content(message),
-                    "timestamp":  parsedate_to_datetime(message.get("Date")),
+                    "timestamp": parsedate_to_datetime(message.get("Date")),
                 }
             )
             message = prev_message
@@ -327,7 +337,7 @@ def set_primary_logger(log_level):
     logger.add(stderr, format=logger_format, colorize=True, level=log_level)
 
 
-def send_reply(client: IMAPClient, msg_id: int, message_id: str):
+def send_reply(openai: OpenAI, client: IMAPClient, msg_id: int, message_id: str, model="mistralai/mistral-7b-instruct:free"):
     """Send a reply to the email with the specified message ID."""
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.debug(f"Sending reply to email {message_id}")
@@ -335,8 +345,12 @@ def send_reply(client: IMAPClient, msg_id: int, message_id: str):
     thread = set_roles(thread)
     logger.debug(f"Thread history (message_identifier): {thread}")
     logger.debug(f"Thread history length (message_identifier): {len(thread)}")
+    generated_response = openai.chat.completions.create(
+        model=model,
+        messages=thread,
+    )
+    logger.info(f"Generated response: {generated_response.choices[0].message.content}")
     logger.error("Sending replies is not implemented yet.")
-
 
 
 def get_plain_email_content(message: Message | str) -> str:
@@ -363,6 +377,7 @@ def get_plain_email_content(message: Message | str) -> str:
             body = message.get_payload(decode=True).decode()
             return html2text.html2text(str(body.decode("unicode_escape")))
 
+
 def set_roles(thread_history: list[dict]) -> list[dict]:
     """Change all email senders to roles (assistant or user)"""
     # Change email senders to roles
@@ -374,8 +389,13 @@ def set_roles(thread_history: list[dict]) -> list[dict]:
     # Delete the sender key
     for email in thread_history:
         del email["sender"]
-    
+    # Delete timestamp key
+    for email in thread_history:
+        if "timestamp" in email:
+            del email["timestamp"]
+
     return thread_history
+
 
 if __name__ == "__main__":
     main()
