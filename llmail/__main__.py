@@ -11,7 +11,6 @@ from email.utils import getaddresses
 
 from llmail.utils.cli_args import argparser
 
-email_threads = {}
 
 class EmailThread:
     def __init__(self, initial_email):
@@ -28,9 +27,14 @@ class EmailThread:
         else:
             logger.debug(f"Reply email {reply_email} already exists in thread")
 
+    @property
+    def user_replies(self):
+        '''Return the replies that are from the user'''
+        return [reply for reply in self.replies if reply.sender != bot_email]
+
     def sort_replies(self):
         self.replies = sorted(self.replies, key=lambda x: x.timestamp)
-        # Honestly, it might be better to sort by the message_id
+        # Honestly, it might be better to sort by the message_id. This also goes for the get_thread_history function
         # However, this **significantly** reduces complexity so for now, it's fine
 
     def __repr__(self):
@@ -53,6 +57,7 @@ class Email:
 
 args = None
 bot_email = None
+email_threads = {}
 
 
 def main():
@@ -105,7 +110,8 @@ def fetch_and_process_emails():
                 message_id = message_id_header if message_id_header else msg_id
 
                 # Check if the email is new (not replied to by the bot yet)
-                if is_most_recent_user_email(client, msg_id, sender):
+                # if is_most_recent_user_email(client, msg_id, sender):
+                if True:
                     logger.debug(f"On email from {sender} sent at {timestamp} with subject {subject}")
                     # Put this as message_id so the key for email_threads is the top-level if this email is top-level
                     parent_email_id = get_top_level_email(client, msg_id, message_id)
@@ -140,6 +146,7 @@ def fetch_and_process_emails():
                         email_threads[parent_email_id] = email_thread
                         logger.info(f"Created new thread for email {message_id} sent at {timestamp}")
 
+
         # Send replies outside of the loop
         for email_thread in email_threads.values():
             most_recent_imap_id = email_thread.replies[-1].imap_id
@@ -173,7 +180,7 @@ def get_thread_history(client: IMAPClient, message_identifier: str | int | Email
         thread_history = []
         thread_history.append({"sender": message_identifier.initial_email.sender, "content": message_identifier.initial_email.body})
         for email in message_identifier.replies:
-            thread_history.append({"sender": email.sender, "content": email.body})
+            thread_history.append({"sender": email.sender, "content": email.body, "timestamp": email.timestamp})
         return thread_history
     elif isinstance(message_identifier, int) or isinstance(message_identifier, str):
         client.select_folder("INBOX")
@@ -197,7 +204,7 @@ def get_thread_history(client: IMAPClient, message_identifier: str | int | Email
                 break
         raw_message = msg_data[msg_id][b"RFC822"]
         message = message_from_bytes(raw_message)
-        thread_history.append({"sender": get_sender(message), "content": get_plain_email_content(message)})
+        thread_history.append({"sender": get_sender(message)["email"], "content": get_plain_email_content(message), "timestamp": message.get("Date")})
 
         # Fetch previous emails in the thread if available
         while message.get("In-Reply-To"):
@@ -206,9 +213,10 @@ def get_thread_history(client: IMAPClient, message_identifier: str | int | Email
             prev_msg_data = client.fetch([prev_msg_id], ["RFC822"])
             prev_raw_message = prev_msg_data[prev_msg_id][b"RFC822"]
             prev_message = message_from_bytes(prev_raw_message)
-            thread_history.append({"sender": get_sender(message), "content": get_plain_email_content(message)})
+            thread_history.append({"sender": get_sender(message), "content": get_plain_email_content(message), "timestamp": message.get("Date")})
             message = prev_message
-
+        # Sort the thread history by timestamp
+        thread_history = sorted(thread_history, key=lambda x: x["timestamp"])
         return thread_history
     else:
         raise TypeError("Invalid type for message. Must be an int, str, or EmailThread object.")
