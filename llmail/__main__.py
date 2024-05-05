@@ -87,12 +87,10 @@ def fetch_and_process_emails():
         password_subject = "autoreply password"
 
         email_threads = {}
-        # It's really inefficient to fetch all folders and then select them one by one
-        # This is here because I was trying to implement two ways to get entire threads
-        # The issue with trying to create objects with the replies in them is that sent emails may be omitted from the history
-        # Thus, it's probably better to just get the entire thread history when needed and not store it in objects
-        # Perhaps it may be better to ask for a "Sent emails" folder or something
-        for folder in client.list_folders():
+        # for folder in client.list_folders():
+        # Disabling fetching from all folders due it not being inefficient
+        # Instead, just fetch from INBOX and get the threads later
+        for folder in [(None, None, "INBOX")]:
             try:
                 client.select_folder(folder[2])
             # If the error is imaplib.IMAP4.error: select failed:...
@@ -123,6 +121,7 @@ def fetch_and_process_emails():
                     # Put this as message_id so the key for email_threads is the top-level if this email is top-level
                     parent_email_id = get_top_level_email(client, msg_id, message_id)
 
+                    # Unless EmailThread is being used for threads, this is mainly useful for debugging
                     if parent_email_id in email_threads:
                         # Add the reply to the existing thread
                         email_threads[parent_email_id].add_reply(
@@ -192,7 +191,7 @@ def get_thread_history(
     """Fetch the entire thread history for the specified message ID."""
 
     if isinstance(message_identifier, EmailThread):
-        logger.debug("Getting thread history from EmailThread object")
+        logger.warning("Getting thread history from EmailThread object. If EmailThread does not include sent emails (not just INBOX fetched) this will exclude the bot's replies.") # noqa E501
         thread_history = []
         thread_history.append(
             {
@@ -326,9 +325,9 @@ def send_reply(client: IMAPClient, msg_id: int, message_id: str):
     thread = get_thread_history(client, msg_id)
     logger.debug(f"Thread history (message_identifier): {thread}")
     logger.debug(f"Thread history length (message_identifier): {len(thread)}")
-    thread = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
-    logger.debug(f"Thread history (EmailThread object): {thread}")
-    logger.debug(f"Thread history length (EmailThread object): {len(thread)}")
+    # thread = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
+    # # logger.debug(f"Thread history (EmailThread object): {thread}")
+    # # logger.debug(f"Thread history length (EmailThread object): {len(thread)}")
 
 
 def get_plain_email_content(message: Message | str) -> str:
