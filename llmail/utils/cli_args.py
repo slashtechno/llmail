@@ -40,6 +40,14 @@ def set_argparse():
         help="Log level",
         default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO",
     )
+    # OpenAI-compatible API arguments
+    ai_api = argparser.add_argument_group("OpenAI-compatible API")
+    ai_api.add_argument("--api-key", help="OpenAI API key", default=os.getenv("OPENAI_API_KEY"))
+    ai_api.add_argument(
+        "--api-base-url",
+        help="OpenAI API endpoint",
+        default=os.getenv("O"),
+    )
     # Email arguments
     email = argparser.add_argument_group("Email")
     imap = email.add_argument_group("IMAP")

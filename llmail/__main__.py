@@ -7,6 +7,7 @@ from icecream import ic
 from imapclient import IMAPClient
 import imaplib
 from loguru import logger
+from openai import OpenAI
 from email.utils import getaddresses, parsedate_to_datetime
 
 from llmail.utils.cli_args import argparser
@@ -139,30 +140,39 @@ def fetch_and_process_emails():
                         )
                         # logger.debug(f"Added message {message_id} to existing thread for email {parent_email_id}")
                     else:
-                        # Create a new thread for the email
-                        email_thread = EmailThread(
-                            Email(
-                                imap_id=msg_id,
-                                message_id=message_id,
-                                subject=subject,
-                                sender=sender,
-                                timestamp=timestamp,
-                                # Get just the normal email content
-                                body=get_plain_email_content(
-                                    message_from_bytes(msg_data[msg_id][b"BODY[]"])
-                                ),
+                        # Create a new thread for the email, unless it's a bot email
+                        if sender != bot_email:
+                            email_thread = EmailThread(
+                                Email(
+                                    imap_id=msg_id,
+                                    message_id=message_id,
+                                    subject=subject,
+                                    sender=sender,
+                                    timestamp=timestamp,
+                                    # Get just the normal email content
+                                    body=get_plain_email_content(
+                                        message_from_bytes(msg_data[msg_id][b"BODY[]"])
+                                    ),
+                                )
                             )
-                        )
-                        email_threads[parent_email_id] = email_thread
-                        logger.info(
-                            f"Created new thread for email {message_id} sent at {timestamp}"
-                        )
+                            email_threads[parent_email_id] = email_thread
+                            logger.info(
+                                f"Created new thread for email {message_id} sent at {timestamp}"
+                            )
 
         # Send replies outside of the loop
         for email_thread in email_threads.values():
-            most_recent_imap_id = email_thread.replies[-1].imap_id
-            most_recent_message_id = email_thread.replies[-1].message_id
-            send_reply(client, most_recent_imap_id, most_recent_message_id)
+            # Check if the most recent email in the thread is from the user
+            try: 
+                if email_thread.replies[-1].sender != bot_email:
+                    most_recent_imap_id = email_thread.replies[-1].imap_id
+                    most_recent_message_id = email_thread.replies[-1].message_id
+                    send_reply(client, most_recent_imap_id, most_recent_message_id)
+                else:
+                    logger.debug(f"Most recent email in thread {email_thread} is from the bot. Skipping...")
+            except IndexError:
+                logger.debug(f"No replies in thread {email_thread}. Replying to initial email.")
+                send_reply(client, email_thread.initial_email.imap_id, email_thread.initial_email.message_id)
         ic([thread for thread in email_threads.values()])
         logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
@@ -321,13 +331,12 @@ def send_reply(client: IMAPClient, msg_id: int, message_id: str):
     """Send a reply to the email with the specified message ID."""
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.debug(f"Sending reply to email {message_id}")
-    logger.error("Sending replies is not implemented yet.")
     thread = get_thread_history(client, msg_id)
+    thread = set_roles(thread)
     logger.debug(f"Thread history (message_identifier): {thread}")
     logger.debug(f"Thread history length (message_identifier): {len(thread)}")
-    # thread = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
-    # # logger.debug(f"Thread history (EmailThread object): {thread}")
-    # # logger.debug(f"Thread history length (EmailThread object): {len(thread)}")
+    logger.error("Sending replies is not implemented yet.")
+
 
 
 def get_plain_email_content(message: Message | str) -> str:
@@ -354,6 +363,19 @@ def get_plain_email_content(message: Message | str) -> str:
             body = message.get_payload(decode=True).decode()
             return html2text.html2text(str(body.decode("unicode_escape")))
 
+def set_roles(thread_history: list[dict]) -> list[dict]:
+    """Change all email senders to roles (assistant or user)"""
+    # Change email senders to roles
+    for email in thread_history:
+        if email["sender"] == bot_email:
+            email["role"] = "assistant"
+        else:
+            email["role"] = "user"
+    # Delete the sender key
+    for email in thread_history:
+        del email["sender"]
+    
+    return thread_history
 
 if __name__ == "__main__":
     main()
