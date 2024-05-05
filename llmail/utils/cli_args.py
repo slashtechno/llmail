@@ -40,6 +40,13 @@ def set_argparse():
         help="Log level",
         default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO",
     )
+    argparser.add_argument(
+        "--watch-interval",
+        "-w",
+        help="Interval in seconds to check for new emails. If not set, will only check once.",
+        type=int,
+        default=None,
+    )
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
     ai_api.add_argument(
