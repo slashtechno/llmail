@@ -7,7 +7,7 @@ from icecream import ic
 from imapclient import IMAPClient
 import imaplib
 from loguru import logger
-from email.utils import getaddresses
+from email.utils import getaddresses, parsedate_to_datetime
 
 from llmail.utils.cli_args import argparser
 
@@ -20,8 +20,13 @@ class EmailThread:
     def add_reply(self, reply_email):
         # If the message_id of the reply email is not in the list of messages add it
         # Also, don't do it if the email is the inital/top-level email itself
-        if reply_email.message_id not in [email.message_id for email in self.replies] and reply_email.message_id != self.initial_email.message_id:
-            logger.info(f"Reply sent by {reply_email.sender} at {reply_email.timestamp} does not exist in thread. Adding it to thread for email {self.initial_email.message_id}")
+        if (
+            reply_email.message_id not in [email.message_id for email in self.replies]
+            and reply_email.message_id != self.initial_email.message_id
+        ):
+            logger.info(
+                f"Reply sent by {reply_email.sender} at {reply_email.timestamp} does not exist in thread. Adding it to thread for email {self.initial_email.message_id}"
+            )
             self.replies.append(reply_email)
             self.sort_replies()
         else:
@@ -29,7 +34,7 @@ class EmailThread:
 
     @property
     def user_replies(self):
-        '''Return the replies that are from the user'''
+        """Return the replies that are from the user"""
         return [reply for reply in self.replies if reply.sender != bot_email]
 
     def sort_replies(self):
@@ -112,7 +117,9 @@ def fetch_and_process_emails():
                 # Check if the email is new (not replied to by the bot yet)
                 # if is_most_recent_user_email(client, msg_id, sender):
                 if True:
-                    logger.debug(f"On email from {sender} sent at {timestamp} with subject {subject}")
+                    logger.debug(
+                        f"On email from {sender} sent at {timestamp} with subject {subject}"
+                    )
                     # Put this as message_id so the key for email_threads is the top-level if this email is top-level
                     parent_email_id = get_top_level_email(client, msg_id, message_id)
 
@@ -126,7 +133,9 @@ def fetch_and_process_emails():
                                 sender=sender,
                                 timestamp=timestamp,
                                 # Get just the normal email content
-                                body=get_plain_email_content(message_from_bytes(msg_data[msg_id][b"BODY[]"]))
+                                body=get_plain_email_content(
+                                    message_from_bytes(msg_data[msg_id][b"BODY[]"])
+                                ),
                             )
                         )
                         # logger.debug(f"Added message {message_id} to existing thread for email {parent_email_id}")
@@ -140,12 +149,15 @@ def fetch_and_process_emails():
                                 sender=sender,
                                 timestamp=timestamp,
                                 # Get just the normal email content
-                                body=get_plain_email_content(message_from_bytes(msg_data[msg_id][b"BODY[]"]))
+                                body=get_plain_email_content(
+                                    message_from_bytes(msg_data[msg_id][b"BODY[]"])
+                                ),
                             )
                         )
                         email_threads[parent_email_id] = email_thread
-                        logger.info(f"Created new thread for email {message_id} sent at {timestamp}")
-
+                        logger.info(
+                            f"Created new thread for email {message_id} sent at {timestamp}"
+                        )
 
         # Send replies outside of the loop
         for email_thread in email_threads.values():
@@ -168,26 +180,39 @@ def is_most_recent_user_email(client, msg_id, sender):
     headers_bytes = msg_data[msg_id][b"RFC822.HEADER"]
     headers = message_from_bytes(headers_bytes)
     timestamp = headers.get("Date")
-    logger.debug(f"Checking if email with UID {msg_id} from {sender} sent on {timestamp} is most recent user email")
+    logger.debug(
+        f"Checking if email with UID {msg_id} from {sender} sent on {timestamp} is most recent user email"
+    )
     return sender != bot_email
 
 
-def get_thread_history(client: IMAPClient, message_identifier: str | int | EmailThread) -> list[dict]:
+def get_thread_history(
+    client: IMAPClient, message_identifier: str | int | EmailThread
+) -> list[dict]:
     """Fetch the entire thread history for the specified message ID."""
 
     if isinstance(message_identifier, EmailThread):
         logger.debug("Getting thread history from EmailThread object")
         thread_history = []
-        thread_history.append({"sender": message_identifier.initial_email.sender, "content": message_identifier.initial_email.body})
+        thread_history.append(
+            {
+                "sender": message_identifier.initial_email.sender,
+                "content": message_identifier.initial_email.body,
+            }
+        )
         for email in message_identifier.replies:
-            thread_history.append({"sender": email.sender, "content": email.body, "timestamp": email.timestamp})
+            thread_history.append(
+                {"sender": email.sender, "content": email.body, "timestamp": email.timestamp}
+            )
         return thread_history
     elif isinstance(message_identifier, int) or isinstance(message_identifier, str):
         client.select_folder("INBOX")
         if isinstance(message_identifier, str):
             message_id = message_identifier
             msg_id = get_uid_from_message_id(client, message_id)
-            logger.debug(f"Getting thread history from Message-ID {message_id} with IMAP UID {msg_id}")
+            logger.debug(
+                f"Getting thread history from Message-ID {message_id} with IMAP UID {msg_id}"
+            )
         else:
             msg_id = message_identifier
             logger.debug(f"Getting thread history from IMAP UID {msg_id}")
@@ -200,11 +225,17 @@ def get_thread_history(client: IMAPClient, message_identifier: str | int | Email
                 logger.debug(f"Failed to select folder {folder[2]}. Skipping...")
                 continue
             msg_data = client.fetch([msg_id], ["RFC822"])
-            if msg_data: 
+            if msg_data:
                 break
         raw_message = msg_data[msg_id][b"RFC822"]
         message = message_from_bytes(raw_message)
-        thread_history.append({"sender": get_sender(message)["email"], "content": get_plain_email_content(message), "timestamp": message.get("Date")})
+        thread_history.append(
+            {
+                "sender": get_sender(message)["email"],
+                "content": get_plain_email_content(message),
+                "timestamp":  parsedate_to_datetime(message.get("Date")),
+            }
+        )
 
         # Fetch previous emails in the thread if available
         while message.get("In-Reply-To"):
@@ -213,7 +244,13 @@ def get_thread_history(client: IMAPClient, message_identifier: str | int | Email
             prev_msg_data = client.fetch([prev_msg_id], ["RFC822"])
             prev_raw_message = prev_msg_data[prev_msg_id][b"RFC822"]
             prev_message = message_from_bytes(prev_raw_message)
-            thread_history.append({"sender": get_sender(message), "content": get_plain_email_content(message), "timestamp": message.get("Date")})
+            thread_history.append(
+                {
+                    "sender": get_sender(message),
+                    "content": get_plain_email_content(message),
+                    "timestamp":  parsedate_to_datetime(message.get("Date")),
+                }
+            )
             message = prev_message
         # Sort the thread history by timestamp
         thread_history = sorted(thread_history, key=lambda x: x["timestamp"])
@@ -267,7 +304,9 @@ def get_uid_from_message_id(imap_client, message_id):
                 f"UID of message with Message-ID {message_id} is {uid}. Email subject: {imap_client.fetch([uid], ['ENVELOPE'])[uid][b'ENVELOPE'].subject}"
             )
             return uid
-    logger.warning(f"UID of message with Message-ID {message_id} not found. Trying to check all headers and text.")
+    logger.warning(
+        f"UID of message with Message-ID {message_id} not found. Trying to check all headers and text."
+    )
     return None
 
 
@@ -290,6 +329,7 @@ def send_reply(client: IMAPClient, msg_id: int, message_id: str):
     thread = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
     logger.debug(f"Thread history (EmailThread object): {thread}")
     logger.debug(f"Thread history length (EmailThread object): {len(thread)}")
+
 
 def get_plain_email_content(message: Message | str) -> str:
     """Get the content of the email message. If a  message object is provided, it will be parsed
@@ -314,6 +354,7 @@ def get_plain_email_content(message: Message | str) -> str:
             logger.debug("Message is not multipart. Getting payload as string.")
             body = message.get_payload(decode=True).decode()
             return html2text.html2text(str(body.decode("unicode_escape")))
+
 
 if __name__ == "__main__":
     main()

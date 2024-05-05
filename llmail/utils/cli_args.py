@@ -16,6 +16,7 @@ For reference, Gmail's IMAP settings are:
 
 # TODO: Add argument for specific IMAP folder. Default to INBOX
 
+
 def set_argparse():
     global argparser
 

@@ -21,7 +21,7 @@ ruff = "^0.4.2"
 black = "^24.4.2"
 
 [tool.ruff]
-line-length = 135
+line-length = 100
 lint.extend-select= ["FIX002"]
 
 [tool.poetry.scripts]
