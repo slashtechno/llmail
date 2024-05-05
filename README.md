@@ -19,7 +19,7 @@ Interact with Large Language Models (LLMs) via email.
 Cloning the repository is not required when installing from PyPi but is required when installing from source  
 1. Clone this repo with `git clone https://github.com/slashtechno/llmail`  
 2. `cd` into the cloned repository  
-3. Install with [Poetry](https://python-poetry.org/) <!---or run with Docker  --->
+3. Install with [Poetry](https://python-poetry.org/) <!-- or [Docker](https://www.docker.com/) -->
 
 <!-- 
 #### Installing from PyPi with pip (recommended)  
