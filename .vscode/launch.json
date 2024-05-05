@@ -11,7 +11,7 @@
             "module": "llmail",
             "args": [
             ],
-            "justMyCode": false
+            "justMyCode": true
         },
     ]
 }

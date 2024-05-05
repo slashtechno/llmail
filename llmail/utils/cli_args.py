@@ -63,8 +63,22 @@ def set_argparse():
         help="IMAP server password",
         default=os.getenv("IMAP_PASSWORD"),
     )
+    smtp = email.add_argument_group("SMTP")
+    smtp.add_argument("--smtp-host", help="SMTP server hostname", default=os.getenv("SMTP_HOST"))
+    smtp.add_argument("--smtp-port", help="SMTP server port", default=os.getenv("SMTP_PORT"))
+    smtp.add_argument(
+        "--smtp-username",
+        help="SMTP server username",
+        default=os.getenv("SMTP_USERNAME"),
+    )
+    smtp.add_argument(
+        "--smtp-password",
+        help="SMTP server password",
+        default=os.getenv("SMTP_PASSWORD"),
+    )
 
-    check_required_args(["imap_host", "imap_port", "imap_username", "imap_password", "openai_api_key", "openai_base_url"], argparser)
+    check_required_args(["imap_host", "imap_port", "imap_username", "imap_password", "smtp_host", "smtp_port", "smtp_username", "smtp_password",
+                         "openai_api_key", "openai_base_url"], argparser)
 
 
 def check_required_args(required_args: list[str], argparser: argparse.ArgumentParser):

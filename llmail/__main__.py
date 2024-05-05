@@ -342,6 +342,8 @@ def send_reply(openai: OpenAI, client: IMAPClient, msg_id: int, message_id: str,
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.debug(f"Sending reply to email {message_id}")
     thread = get_thread_history(client, msg_id)
+    # Set roles deletes the sender key so we need to store the sender before calling it
+    sender = thread[-1]["sender"]
     thread = set_roles(thread)
     logger.debug(f"Thread history (message_identifier): {thread}")
     logger.debug(f"Thread history length (message_identifier): {len(thread)}")
@@ -349,8 +351,20 @@ def send_reply(openai: OpenAI, client: IMAPClient, msg_id: int, message_id: str,
         model=model,
         messages=thread,
     )
-    logger.info(f"Generated response: {generated_response.choices[0].message.content}")
-    logger.error("Sending replies is not implemented yet.")
+    generated_response = generated_response.choices[0].message.content
+    logger.info(f"Generated response: {generated_response}")
+    yag = yagmail.SMTP(
+        user=args.smtp_username,
+        password=args.smtp_password,
+        host=args.smtp_host,
+        port=int(args.smtp_port),
+    )
+    logger.debug(f"Sending email to {sender}")
+    yag.send(
+        to=sender,
+        subject="Re: autoreply password",
+        contents=generated_response,
+    )
 
 
 def get_plain_email_content(message: Message | str) -> str:
