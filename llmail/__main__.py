@@ -98,12 +98,13 @@ def fetch_and_process_emails():
         client.login(args.imap_username, args.imap_password)
 
         email_threads = {}
+        folders = args.folder if args.folder else [folder[2] for folder in client.list_folders()]
         # for folder in client.list_folders():
         # Disabling fetching from all folders due it not being inefficient
         # Instead, just fetch from INBOX and get the threads later
-        for folder in [(None, None, "INBOX")]:
+        for folder in folders:
             try:
-                client.select_folder(folder[2])
+                client.select_folder(folder)
             # If the error is imaplib.IMAP4.error: select failed:...
             except imaplib.IMAP4.error:
                 logger.debug(f"Failed to select folder {folder[2]}. Skipping...")
@@ -205,7 +206,7 @@ def fetch_and_process_emails():
 
             # If only INBOX is fetched, the bot's replies may not be in EmailThread
             # Thus, we can't just do if email_thread.replies[-1].sender != bot_email
-            thread = get_thread_history(client, msg_id)
+            thread = get_thread_history(client, message_id)
             send_reply(thread, client, uid, message_id, references_ids, openai)
 
         ic([thread for thread in email_threads.values()])
@@ -400,6 +401,9 @@ def send_reply(
     references_ids.append(message_id)
     logger.debug(f"Thread history (message_identifier): {thread}")
     logger.debug(f"Thread history length (message_identifier): {len(thread)}")
+    thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
+    logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
+    logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
     generated_response = openai.chat.completions.create(
         model=model,
         messages=thread,

@@ -59,6 +59,14 @@ def set_argparse():
     )
     # Email arguments
     email = argparser.add_argument_group("Email")
+    email.add_argument(
+        "--folder",
+        "-f",
+        help="IMAP folder(s) to watch for new emails",
+        # Argparse should append to a list if None is the default
+        default=None,
+        action="append",
+    )
     imap = email.add_argument_group("IMAP")
     imap.add_argument("--imap-host", help="IMAP server hostname", default=os.getenv("IMAP_HOST"))
     imap.add_argument("--imap-port", help="IMAP server port", default=os.getenv("IMAP_PORT"))
