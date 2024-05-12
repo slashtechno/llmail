@@ -77,17 +77,26 @@ def main():
     global bot_email
     args = argparser.parse_args()
 
-    bot_email = args.imap_username
 
-    # Set up logging
-    set_primary_logger(args.log_level)
-    ic(args)
-    if args.watch_interval:
-        while True:
-            fetch_and_process_emails()
-            time.sleep(args.watch_interval)
-    else:
-        fetch_and_process_emails()
+    match args.subcommand:
+        case "list-folders":
+            with IMAPClient(args.imap_host) as client:
+                client.login(args.imap_username, args.imap_password)
+                folders = client.list_folders()
+                for folder in folders:
+                    print(folder[2])
+        case None:
+            bot_email = args.imap_username
+
+            # Set up logging
+            set_primary_logger(args.log_level)
+            ic(args)
+            if args.watch_interval:
+                while True:
+                    fetch_and_process_emails()
+                    time.sleep(args.watch_interval)
+            else:
+                fetch_and_process_emails()
 
 
 def fetch_and_process_emails():
@@ -390,6 +399,7 @@ def send_reply(
     """Send a reply to the email with the specified message ID."""
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     logger.info(f"Sending reply to email {message_id}")
+    # TODO: Remove this when the migration to EmailThread is complete
     thread = get_thread_history(client, msg_id)
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]

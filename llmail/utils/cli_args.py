@@ -31,7 +31,13 @@ def set_argparse():
         description="Interact with an LLM through email.",
         epilog=":)",
     )
-
+    # Subcommands
+    subparsers = argparser.add_subparsers(
+        # Dest means that the current subcommand can be accessed via args.subcommand
+        dest="subcommand"
+        )
+    # Subcommand: list-folders
+    _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
     # General arguments
     argparser.add_argument(
         "--log-level",
@@ -63,7 +69,7 @@ def set_argparse():
         "-f",
         help="IMAP folder(s) to watch for new emails",
         # Argparse should append to a list if None is the default
-        default=None,
+        default=os.getenv("FOLDER").split(",") if os.getenv("FOLDER") else None,
         action="append",
     )
     imap = email.add_argument_group("IMAP")

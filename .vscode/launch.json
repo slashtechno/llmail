@@ -14,17 +14,32 @@
             "justMyCode": true
         },
         {
-            "name": "Debug INBOX as folders",
+            "name": "Debug with custom folder",
             "type": "debugpy",
             "request": "launch",
             "module": "llmail",
             "args": [
                 "--folder",
-                "INBOX",
-                "--folder",
-                "INBOX"
+                "${input:folder}"
             ],
             "justMyCode": true
         },
+        {
+            "name": "Run list-folders",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "llmail",
+            "args": [
+                "list-folders"
+            ],
+        }
+
+    ],
+    "inputs": [
+        {
+            "id": "folder",
+            "type": "promptString",
+            "description": "Folder name"
+        }
     ]
 }
