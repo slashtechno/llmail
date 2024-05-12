@@ -14,7 +14,6 @@ For reference, Gmail's IMAP settings are:
 - Password: App token (when using 2FA) or perhaps your regular password (if not using 2FA ?)
 """
 
-# TODO: Add argument for specific IMAP folder. Default to INBOX
 
 
 def set_argparse():
@@ -32,7 +31,14 @@ def set_argparse():
         description="Interact with an LLM through email.",
         epilog=":)",
     )
-
+    # Subcommands
+    subparsers = argparser.add_subparsers(
+        # Dest means that the current subcommand can be accessed via args.subcommand
+        dest="subcommand",
+        title="Subcommands",
+        )
+    # Subcommand: list-folders
+    _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
     # General arguments
     argparser.add_argument(
         "--log-level",
@@ -45,7 +51,7 @@ def set_argparse():
         "-w",
         help="Interval in seconds to check for new emails. If not set, will only check once.",
         type=int,
-        default=None,
+        default=int(os.getenv("WATCH_INTERVAL")) if os.getenv("WATCH_INTERVAL") else None,
     )
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
@@ -59,6 +65,14 @@ def set_argparse():
     )
     # Email arguments
     email = argparser.add_argument_group("Email")
+    email.add_argument(
+        "--folder",
+        "-f",
+        help="IMAP folder(s) to watch for new emails",
+        # Argparse should append to a list if None is the default
+        default=os.getenv("FOLDER").split(",") if os.getenv("FOLDER") else None,
+        action="append",
+    )
     imap = email.add_argument_group("IMAP")
     imap.add_argument("--imap-host", help="IMAP server hostname", default=os.getenv("IMAP_HOST"))
     imap.add_argument("--imap-port", help="IMAP server port", default=os.getenv("IMAP_PORT"))
@@ -84,6 +98,11 @@ def set_argparse():
         "--smtp-password",
         help="SMTP server password",
         default=os.getenv("SMTP_PASSWORD"),
+    )
+    smtp.add_argument(
+        "--message-id-domain",
+        help="Domain to use for Message-ID header",
+        default=os.getenv("MESSAGE_ID_DOMAIN") if os.getenv("MESSAGE_ID_DOMAIN") else None,
     )
 
     check_required_args(

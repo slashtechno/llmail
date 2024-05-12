@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Quick Debug",
+            "name": "Debug without args",
             "type": "debugpy",
             "request": "launch",
             "module": "llmail",
@@ -13,5 +13,33 @@
             ],
             "justMyCode": true
         },
+        {
+            "name": "Debug with custom folder",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "llmail",
+            "args": [
+                "--folder",
+                "${input:folder}"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "Run list-folders",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "llmail",
+            "args": [
+                "list-folders"
+            ],
+        }
+
+    ],
+    "inputs": [
+        {
+            "id": "folder",
+            "type": "promptString",
+            "description": "Folder name"
+        }
     ]
 }

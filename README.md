@@ -34,8 +34,8 @@ This assumes you have the correct version of Python installed
 
 <!-- #### Docker  -->
 ### Configuration  
-To configure the program, either use CLI flags (`--help` for more information) or environment variables.  
-It is recommended to just copy .env.example to .env and fill in the necessary information.
+To configure the program, either use CLI flags (`--help` for more information) or environment variables.
+It is recommended to just copy `.env.example` to `.env` and fill in the necessary information.
 
 ### How to uninstall  
 - If you used Poetry, just delete the virtual environment and then the cloned repository

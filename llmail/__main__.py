@@ -8,7 +8,7 @@ from imapclient import IMAPClient
 import imaplib
 from loguru import logger
 from openai import OpenAI
-from email.utils import getaddresses, parsedate_to_datetime
+from email.utils import getaddresses, parsedate_to_datetime, make_msgid
 from datetime import timezone
 import time
 
@@ -28,7 +28,7 @@ class EmailThread:
             reply_email.message_id not in [email.message_id for email in self.replies]
             and reply_email.message_id != self.initial_email.message_id
         ):
-            logger.info(
+            logger.debug(
                 f"Reply sent by {reply_email.sender} at {reply_email.timestamp} does not exist in thread. Adding it to thread for email {self.initial_email.message_id}"
             )
             self.replies.append(reply_email)
@@ -77,17 +77,27 @@ def main():
     global bot_email
     args = argparser.parse_args()
 
-    bot_email = args.imap_username
 
-    # Set up logging
-    set_primary_logger(args.log_level)
-    ic(args)
-    if args.watch_interval:
-        while True:
-            fetch_and_process_emails()
-            time.sleep(args.watch_interval)
-    else:
-        fetch_and_process_emails()
+    match args.subcommand:
+        case "list-folders":
+            with IMAPClient(args.imap_host) as client:
+                client.login(args.imap_username, args.imap_password)
+                folders = client.list_folders()
+                for folder in folders:
+                    print(folder[2])
+        case None:
+            bot_email = args.imap_username
+
+            # Set up logging
+            set_primary_logger(args.log_level)
+            ic(args)
+            if args.watch_interval:
+                logger.info(f"Watching for new emails every {args.watch_interval} seconds")
+                while True:
+                    fetch_and_process_emails()
+                    time.sleep(args.watch_interval)
+            else:
+                fetch_and_process_emails()
 
 
 def fetch_and_process_emails():
@@ -98,12 +108,13 @@ def fetch_and_process_emails():
         client.login(args.imap_username, args.imap_password)
 
         email_threads = {}
+        folders = args.folder if args.folder else [folder[2] for folder in client.list_folders()]
         # for folder in client.list_folders():
         # Disabling fetching from all folders due it not being inefficient
         # Instead, just fetch from INBOX and get the threads later
-        for folder in [(None, None, "INBOX")]:
+        for folder in folders:
             try:
-                client.select_folder(folder[2])
+                client.select_folder(folder)
             # If the error is imaplib.IMAP4.error: select failed:...
             except imaplib.IMAP4.error:
                 logger.debug(f"Failed to select folder {folder[2]}. Skipping...")
@@ -178,37 +189,37 @@ def fetch_and_process_emails():
                                 f"Created new thread for email {message_id} sent at {timestamp}"
                             )
 
-        # Send replies outside of the loop
-        for email_thread in email_threads.values():
-            # Check if we're on the last email in the
-            # We don't have to use user_replies since we're checking if the bot replied to the email later
+        # ic([thread for thread in email_threads.values()])
+        ic(email_threads)
+        # Check if there are any emails wherein the last email in the thread is a user email
+        # If so, send a reply
+        for message_id, email_thread in email_threads.items():
+            # Check if the email only has an initial email
+            # If it does, then there won't be any replies and an index error will occur
             if len(email_thread.replies) == 0:
-                uid = email_thread.initial_email.imap_id
+                logger.debug(f"No replies in thread for email {message_id}")
                 message_id = email_thread.initial_email.message_id
+                msg_id = email_thread.initial_email.imap_id
                 references_ids = email_thread.initial_email.references
-            elif len(email_thread.replies) > 0:
-                uid = email_thread.replies[-1].imap_id
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender != bot_email:
+                logger.debug(f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}")
                 message_id = email_thread.replies[-1].message_id
+                msg_id = email_thread.replies[-1].imap_id
                 references_ids = email_thread.replies[-1].references
-                logger.debug(
-                    f"Most recent email in thread: {email_thread.replies[-1]} | Sent at {email_thread.replies[-1].timestamp}"
-                )
-                if email_thread.replies[-1].sender == bot_email:
-                    logger.debug(
-                        f"Most recent email in thread for email {message_id} is from the bot. Skipping..."
-                    )
-                    continue
-
-            if is_newer_reference(client, message_id):
-                logger.debug(f"Email {message_id} has newer references. Skipping...")
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender == bot_email:
+                logger.debug(f"Last email in thread for email {message_id} is from the bot")
                 continue
+            else:
+                ValueError("Invalid email thread")
+            send_reply(
+                thread=get_thread_history(client, email_thread),
+                client=client,
+                msg_id=msg_id,
+                message_id=message_id,
+                references_ids=references_ids,
+                openai=openai,
+            )
 
-            # If only INBOX is fetched, the bot's replies may not be in EmailThread
-            # Thus, we can't just do if email_thread.replies[-1].sender != bot_email
-            thread = get_thread_history(client, msg_id)
-            send_reply(thread, client, uid, message_id, references_ids, openai)
-
-        ic([thread for thread in email_threads.values()])
         logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
 
@@ -234,12 +245,8 @@ def get_thread_history(
     client: IMAPClient, message_identifier: str | int | EmailThread
 ) -> list[dict]:
     """Fetch the entire thread history for the specified message ID."""
-
+    # Might be better to use "is"
     if isinstance(message_identifier, EmailThread):
-        # TODO: At this point, EmaiLThread should be the default due to it only needing to search all folders once.
-        logger.warning(
-            "Getting thread history from EmailThread object. If EmailThread does not include sent emails (not just INBOX fetched) this will exclude the bot's replies."
-        )  # noqa E501
         thread_history = []
         thread_history.append(
             {
@@ -293,7 +300,7 @@ def get_thread_history(
             prev_message = message_from_bytes(prev_raw_message)
             thread_history.append(
                 {
-                    "sender": get_sender(message),
+                    "sender": get_sender(message)["email"],
                     "content": get_plain_email_content(message),
                     "timestamp": make_tz_aware(parsedate_to_datetime(message.get("Date"))),
                 }
@@ -391,33 +398,37 @@ def send_reply(
     model="mistralai/mistral-7b-instruct:free",
 ):
     """Send a reply to the email with the specified message ID."""
-    # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
-    logger.info(f"Sending reply to email {message_id}")
-    thread = get_thread_history(client, msg_id)
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]
     thread = set_roles(thread)
     references_ids.append(message_id)
-    logger.debug(f"Thread history (message_identifier): {thread}")
-    logger.debug(f"Thread history length (message_identifier): {len(thread)}")
+    # thread_from_msg_id = get_thread_history(client, msg_id)
+    # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
+    # logger.debug(f"Thread history length (message_identifier): {len(thread_from_msg_id)}")
+    # thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
+    # logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
+    # logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
+    logger.info(f"Sending reply to email {message_id} to {sender}")
+    logger.debug(f"Thread history: {thread}")
+    logger.debug(f"Thread history length: {len(thread)}")
     generated_response = openai.chat.completions.create(
         model=model,
         messages=thread,
     )
     generated_response = generated_response.choices[0].message.content
-    logger.info(f"Generated response: {generated_response}")
+    logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
         user=args.smtp_username,
         password=args.smtp_password,
         host=args.smtp_host,
         port=int(args.smtp_port),
     )
-    logger.debug(f"Sending email to {sender}")
     yag.send(
-        to=sender["email"],
+        to=sender,
         subject=f"Re: {SUBJECT}",
         headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
         contents=generated_response,
+        message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else "llmail"),
     )
 
 
