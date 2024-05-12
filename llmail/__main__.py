@@ -179,37 +179,37 @@ def fetch_and_process_emails():
                                 f"Created new thread for email {message_id} sent at {timestamp}"
                             )
 
-        # Send replies outside of the loop
-        for email_thread in email_threads.values():
-            # Check if we're on the last email in the
-            # We don't have to use user_replies since we're checking if the bot replied to the email later
+        # ic([thread for thread in email_threads.values()])
+        ic(email_threads)
+        # Check if there are any emails wherein the last email in the thread is a user email
+        # If so, send a reply
+        for message_id, email_thread in email_threads.items():
+            # Check if the email only has an initial email
+            # If it does, then there won't be any replies and an index error will occur
             if len(email_thread.replies) == 0:
-                uid = email_thread.initial_email.imap_id
+                logger.debug(f"No replies in thread for email {message_id}")
                 message_id = email_thread.initial_email.message_id
+                msg_id = email_thread.initial_email.imap_id
                 references_ids = email_thread.initial_email.references
-            elif len(email_thread.replies) > 0:
-                uid = email_thread.replies[-1].imap_id
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender != bot_email:
+                logger.debug(f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}")
                 message_id = email_thread.replies[-1].message_id
+                msg_id = email_thread.replies[-1].imap_id
                 references_ids = email_thread.replies[-1].references
-                logger.debug(
-                    f"Most recent email in thread: {email_thread.replies[-1]} | Sent at {email_thread.replies[-1].timestamp}"
-                )
-                if email_thread.replies[-1].sender == bot_email:
-                    logger.debug(
-                        f"Most recent email in thread for email {message_id} is from the bot. Skipping..."
-                    )
-                    continue
-
-            if is_newer_reference(client, message_id):
-                logger.debug(f"Email {message_id} has newer references. Skipping...")
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender == bot_email:
+                logger.debug(f"Last email in thread for email {message_id} is from the bot")
                 continue
+            else:
+                ValueError("Invalid email thread")
+            send_reply(
+                thread=get_thread_history(client, email_thread),
+                client=client,
+                msg_id=msg_id,
+                message_id=message_id,
+                references_ids=references_ids,
+                openai=openai,
+            )
 
-            # If only INBOX is fetched, the bot's replies may not be in EmailThread
-            # Thus, we can't just do if email_thread.replies[-1].sender != bot_email
-            thread = get_thread_history(client, message_id)
-            send_reply(thread, client, uid, message_id, references_ids, openai)
-
-        ic([thread for thread in email_threads.values()])
         logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
 
 
@@ -235,12 +235,8 @@ def get_thread_history(
     client: IMAPClient, message_identifier: str | int | EmailThread
 ) -> list[dict]:
     """Fetch the entire thread history for the specified message ID."""
-
+    # Might be better to use "is"
     if isinstance(message_identifier, EmailThread):
-        # TODO: At this point, EmaiLThread should be the default due to it only needing to search all folders once.
-        logger.warning(
-            "Getting thread history from EmailThread object. If EmailThread does not include sent emails (not just INBOX fetched) this will exclude the bot's replies."
-        )  # noqa E501
         thread_history = []
         thread_history.append(
             {
@@ -294,7 +290,7 @@ def get_thread_history(
             prev_message = message_from_bytes(prev_raw_message)
             thread_history.append(
                 {
-                    "sender": get_sender(message),
+                    "sender": get_sender(message)["email"],
                     "content": get_plain_email_content(message),
                     "timestamp": make_tz_aware(parsedate_to_datetime(message.get("Date"))),
                 }
@@ -404,25 +400,25 @@ def send_reply(
     thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
     logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
     logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
-    generated_response = openai.chat.completions.create(
-        model=model,
-        messages=thread,
-    )
-    generated_response = generated_response.choices[0].message.content
-    logger.info(f"Generated response: {generated_response}")
-    yag = yagmail.SMTP(
-        user=args.smtp_username,
-        password=args.smtp_password,
-        host=args.smtp_host,
-        port=int(args.smtp_port),
-    )
-    logger.debug(f"Sending email to {sender}")
-    yag.send(
-        to=sender["email"],
-        subject=f"Re: {SUBJECT}",
-        headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
-        contents=generated_response,
-    )
+    # generated_response = openai.chat.completions.create(
+    #     model=model,
+    #     messages=thread,
+    # )
+    # generated_response = generated_response.choices[0].message.content
+    # logger.info(f"Generated response: {generated_response}")
+    # yag = yagmail.SMTP(
+    #     user=args.smtp_username,
+    #     password=args.smtp_password,
+    #     host=args.smtp_host,
+    #     port=int(args.smtp_port),
+    # )
+    # logger.debug(f"Sending email to {sender}")
+    # yag.send(
+    #     to=sender,
+    #     subject=f"Re: {SUBJECT}",
+    #     headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
+    #     contents=generated_response,
+    # )
 
 
 def get_plain_email_content(message: Message | str) -> str:

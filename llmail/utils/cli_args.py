@@ -14,7 +14,6 @@ For reference, Gmail's IMAP settings are:
 - Password: App token (when using 2FA) or perhaps your regular password (if not using 2FA ?)
 """
 
-# TODO: Add argument for specific IMAP folder. Default to INBOX
 
 
 def set_argparse():
