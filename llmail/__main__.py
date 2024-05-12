@@ -98,6 +98,7 @@ def main():
                 while True:
                     fetch_and_process_emails(
                         subject=args.subject_key,
+                        alias=args.alias,
                         system_prompt=args.system_prompt,
                     )
                     time.sleep(args.watch_interval)
@@ -106,11 +107,13 @@ def main():
             else:
                 fetch_and_process_emails(
                     subject=args.subject_key,
+                    alias=args.alias,
                     system_prompt=args.system_prompt,
                 )
 
 def fetch_and_process_emails(
         subject: str,
+        alias: str = None,
         system_prompt: str = None,
 ):
     """Fetch and process emails from the IMAP server."""
@@ -227,6 +230,7 @@ def fetch_and_process_emails(
             send_reply(
                 thread=get_thread_history(client, email_thread),
                 subject=subject,
+                alias=args.alias,
                 client=client,
                 msg_id=msg_id,
                 message_id=message_id,
@@ -407,6 +411,7 @@ def set_primary_logger(log_level):
 def send_reply(
     thread: list[dict],
     subject: str,
+    alias: str,
     client: IMAPClient,
     msg_id: int,
     message_id: str,
@@ -438,7 +443,7 @@ def send_reply(
     generated_response = generated_response.choices[0].message.content
     logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
-        user=args.smtp_username,
+        user={args.smtp_username: alias} if alias else args.smtp_username,
         password=args.smtp_password,
         host=args.smtp_host,
         port=int(args.smtp_port),

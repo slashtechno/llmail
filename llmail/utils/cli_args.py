@@ -89,6 +89,11 @@ def set_argparse():
         help="Emails with this subject will be replied to",
         default=os.getenv("SUBJECT_KEY") if os.getenv("SUBJECT_KEY") else "llmail autoreply",
     )
+    email.add_argument(
+        "--alias",
+        help="Name to use in the 'From' in addition to the email address",
+        default=os.getenv("ALIAS") if os.getenv("ALIAS") else "LLMail",
+    )
     imap = email.add_argument_group("IMAP")
     imap.add_argument("--imap-host", help="IMAP server hostname", default=os.getenv("IMAP_HOST"))
     imap.add_argument("--imap-port", help="IMAP server port", default=os.getenv("IMAP_PORT"))
