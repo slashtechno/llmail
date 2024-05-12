@@ -1,0 +1,7 @@
+services:
+  llmail:
+    image: ghcr.io/slashtechno/llmail:latest
+    container_name: llmail
+    restart: unless-stopped
+    env_file: .env
+    # command: ["llmail", "arg1", "arg2"]
