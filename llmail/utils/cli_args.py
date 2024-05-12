@@ -50,7 +50,7 @@ def set_argparse():
         "-w",
         help="Interval in seconds to check for new emails. If not set, will only check once.",
         type=int,
-        default=None,
+        default=int(os.getenv("WATCH_INTERVAL")) if os.getenv("WATCH_INTERVAL") else None,
     )
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
@@ -97,6 +97,11 @@ def set_argparse():
         "--smtp-password",
         help="SMTP server password",
         default=os.getenv("SMTP_PASSWORD"),
+    )
+    smtp.add_argument(
+        "--message-id-domain",
+        help="Domain to use for Message-ID header",
+        default=os.getenv("MESSAGE_ID_DOMAIN") if os.getenv("MESSAGE_ID_DOMAIN") else None,
     )
 
     check_required_args(

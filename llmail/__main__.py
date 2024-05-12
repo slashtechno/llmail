@@ -8,7 +8,7 @@ from imapclient import IMAPClient
 import imaplib
 from loguru import logger
 from openai import OpenAI
-from email.utils import getaddresses, parsedate_to_datetime
+from email.utils import getaddresses, parsedate_to_datetime, make_msgid
 from datetime import timezone
 import time
 
@@ -28,7 +28,7 @@ class EmailThread:
             reply_email.message_id not in [email.message_id for email in self.replies]
             and reply_email.message_id != self.initial_email.message_id
         ):
-            logger.info(
+            logger.debug(
                 f"Reply sent by {reply_email.sender} at {reply_email.timestamp} does not exist in thread. Adding it to thread for email {self.initial_email.message_id}"
             )
             self.replies.append(reply_email)
@@ -92,6 +92,7 @@ def main():
             set_primary_logger(args.log_level)
             ic(args)
             if args.watch_interval:
+                logger.info(f"Watching for new emails every {args.watch_interval} seconds")
                 while True:
                     fetch_and_process_emails()
                     time.sleep(args.watch_interval)
@@ -398,37 +399,38 @@ def send_reply(
 ):
     """Send a reply to the email with the specified message ID."""
     # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
-    logger.info(f"Sending reply to email {message_id}")
-    # TODO: Remove this when the migration to EmailThread is complete
-    thread = get_thread_history(client, msg_id)
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]
     thread = set_roles(thread)
     references_ids.append(message_id)
-    logger.debug(f"Thread history (message_identifier): {thread}")
-    logger.debug(f"Thread history length (message_identifier): {len(thread)}")
-    thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
-    logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
-    logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
-    # generated_response = openai.chat.completions.create(
-    #     model=model,
-    #     messages=thread,
-    # )
-    # generated_response = generated_response.choices[0].message.content
-    # logger.info(f"Generated response: {generated_response}")
-    # yag = yagmail.SMTP(
-    #     user=args.smtp_username,
-    #     password=args.smtp_password,
-    #     host=args.smtp_host,
-    #     port=int(args.smtp_port),
-    # )
-    # logger.debug(f"Sending email to {sender}")
-    # yag.send(
-    #     to=sender,
-    #     subject=f"Re: {SUBJECT}",
-    #     headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
-    #     contents=generated_response,
-    # )
+    # thread_from_msg_id = get_thread_history(client, msg_id)
+    # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
+    # logger.debug(f"Thread history length (message_identifier): {len(thread_from_msg_id)}")
+    # thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
+    # logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
+    # logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
+    logger.info(f"Sending reply to email {message_id} to {sender}")
+    logger.debug(f"Thread history: {thread}")
+    logger.debug(f"Thread history length: {len(thread)}")
+    generated_response = openai.chat.completions.create(
+        model=model,
+        messages=thread,
+    )
+    generated_response = generated_response.choices[0].message.content
+    logger.debug(f"Generated response: {generated_response}")
+    yag = yagmail.SMTP(
+        user=args.smtp_username,
+        password=args.smtp_password,
+        host=args.smtp_host,
+        port=int(args.smtp_port),
+    )
+    yag.send(
+        to=sender,
+        subject=f"Re: {SUBJECT}",
+        headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
+        contents=generated_response,
+        message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else None),
+    )
 
 
 def get_plain_email_content(message: Message | str) -> str:
