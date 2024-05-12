@@ -67,7 +67,9 @@ class Email:
 
 args = None
 bot_email = None
+
 email_threads = {}
+
 SUBJECT = "autoreply password"
 
 
@@ -75,6 +77,7 @@ def main():
     """Main entry point for the script."""
     global args
     global bot_email
+    global email_threads
     args = argparser.parse_args()
 
 
@@ -96,6 +99,8 @@ def main():
                 while True:
                     fetch_and_process_emails()
                     time.sleep(args.watch_interval)
+                    # **EMPTY THREADS**
+                    email_threads = {}
             else:
                 fetch_and_process_emails()
 
@@ -122,6 +127,7 @@ def fetch_and_process_emails():
             # messages = client.search([f"(OR SUBJECT \"{SUBJECT}\" SUBJECT \"Re: {SUBJECT}\")"])
             messages = client.search(["OR", "SUBJECT", SUBJECT, "SUBJECT", f"Re: {SUBJECT}"])
             for msg_id in messages:
+                # TODO: It seems this will throw a KeyError if an email is sent while this for loop is running. May have been fixed by emptying email_threads at the end of the while loop? This should be tested again to confirm
                 msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
@@ -218,6 +224,7 @@ def fetch_and_process_emails():
                 message_id=message_id,
                 references_ids=references_ids,
                 openai=openai,
+                model=args.openai_model,
             )
 
         logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
@@ -395,7 +402,7 @@ def send_reply(
     message_id: str,
     references_ids: list[str],
     openai: OpenAI,
-    model="mistralai/mistral-7b-instruct:free",
+    model: str,
 ):
     """Send a reply to the email with the specified message ID."""
     # Set roles deletes the sender key so we need to store the sender before calling it

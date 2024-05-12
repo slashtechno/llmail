@@ -63,6 +63,11 @@ def set_argparse():
         help="OpenAI API endpoint",
         default=os.getenv("OPENAI_BASE_URL"),
     )
+    ai_api.add_argument(
+        "--openai-model",
+        help="Model to use for the LLM",
+        default=os.getenv("OPENAI_MODEL") if os.getenv("OPENAI_MODEL") else "mistralai/mistral-7b-instruct:free",
+    )
     # Email arguments
     email = argparser.add_argument_group("Email")
     email.add_argument(
