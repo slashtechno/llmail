@@ -68,6 +68,11 @@ def set_argparse():
         help="Model to use for the LLM",
         default=os.getenv("OPENAI_MODEL") if os.getenv("OPENAI_MODEL") else "mistralai/mistral-7b-instruct:free",
     )
+    ai_api.add_argument(
+        "--system-prompt",
+        help="Prepend this to the message history sent to the LLM as a message from the system role",
+        default=os.getenv("SYSTEM_PROMPT") if os.getenv("SYSTEM_PROMPT") else None,
+    )
     # Email arguments
     email = argparser.add_argument_group("Email")
     email.add_argument(

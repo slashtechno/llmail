@@ -98,6 +98,7 @@ def main():
                 while True:
                     fetch_and_process_emails(
                         subject=args.subject_key,
+                        system_prompt=args.system_prompt,
                     )
                     time.sleep(args.watch_interval)
                     # **EMPTY THREADS**
@@ -105,10 +106,12 @@ def main():
             else:
                 fetch_and_process_emails(
                     subject=args.subject_key,
+                    system_prompt=args.system_prompt,
                 )
 
 def fetch_and_process_emails(
-        subject: str
+        subject: str,
+        system_prompt: str = None,
 ):
     """Fetch and process emails from the IMAP server."""
     global email_threads
@@ -229,6 +232,7 @@ def fetch_and_process_emails(
                 message_id=message_id,
                 references_ids=references_ids,
                 openai=openai,
+                system_prompt=system_prompt,
                 model=args.openai_model,
             )
 
@@ -408,12 +412,15 @@ def send_reply(
     message_id: str,
     references_ids: list[str],
     openai: OpenAI,
+    system_prompt: str,
     model: str,
 ):
     """Send a reply to the email with the specified message ID."""
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]
     thread = set_roles(thread)
+    if system_prompt:   
+        thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
     # thread_from_msg_id = get_thread_history(client, msg_id)
     # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
