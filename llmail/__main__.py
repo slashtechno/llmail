@@ -398,7 +398,6 @@ def send_reply(
     model="mistralai/mistral-7b-instruct:free",
 ):
     """Send a reply to the email with the specified message ID."""
-    # smtp = yagmail.SMTP(user=args.smtp_username, password=args.smtp_password, host=args.smtp_host, port=args.smtp_port)
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]
     thread = set_roles(thread)
@@ -429,7 +428,7 @@ def send_reply(
         subject=f"Re: {SUBJECT}",
         headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
         contents=generated_response,
-        message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else None),
+        message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else "llmail"),
     )
 
 
