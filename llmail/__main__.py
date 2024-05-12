@@ -70,7 +70,6 @@ bot_email = None
 
 email_threads = {}
 
-SUBJECT = "autoreply password"
 
 
 def main():
@@ -97,15 +96,20 @@ def main():
             if args.watch_interval:
                 logger.info(f"Watching for new emails every {args.watch_interval} seconds")
                 while True:
-                    fetch_and_process_emails()
+                    fetch_and_process_emails(
+                        subject=args.subject_key,
+                    )
                     time.sleep(args.watch_interval)
                     # **EMPTY THREADS**
                     email_threads = {}
             else:
-                fetch_and_process_emails()
+                fetch_and_process_emails(
+                    subject=args.subject_key,
+                )
 
-
-def fetch_and_process_emails():
+def fetch_and_process_emails(
+        subject: str
+):
     """Fetch and process emails from the IMAP server."""
     global email_threads
     openai = OpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
@@ -124,8 +128,8 @@ def fetch_and_process_emails():
             except imaplib.IMAP4.error:
                 logger.debug(f"Failed to select folder {folder[2]}. Skipping...")
                 continue
-            # messages = client.search([f"(OR SUBJECT \"{SUBJECT}\" SUBJECT \"Re: {SUBJECT}\")"])
-            messages = client.search(["OR", "SUBJECT", SUBJECT, "SUBJECT", f"Re: {SUBJECT}"])
+            # Might be smart to also search for forwarded emails
+            messages = client.search(["OR", "SUBJECT", subject, "SUBJECT", f"Re: {subject}"])
             for msg_id in messages:
                 # TODO: It seems this will throw a KeyError if an email is sent while this for loop is running. May have been fixed by emptying email_threads at the end of the while loop? This should be tested again to confirm
                 msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
@@ -219,6 +223,7 @@ def fetch_and_process_emails():
                 ValueError("Invalid email thread")
             send_reply(
                 thread=get_thread_history(client, email_thread),
+                subject=subject,
                 client=client,
                 msg_id=msg_id,
                 message_id=message_id,
@@ -397,6 +402,7 @@ def set_primary_logger(log_level):
 
 def send_reply(
     thread: list[dict],
+    subject: str,
     client: IMAPClient,
     msg_id: int,
     message_id: str,
@@ -432,7 +438,7 @@ def send_reply(
     )
     yag.send(
         to=sender,
-        subject=f"Re: {SUBJECT}",
+        subject=f"Re: {subject}",
         headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
         contents=generated_response,
         message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else "llmail"),
