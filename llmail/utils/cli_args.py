@@ -34,7 +34,8 @@ def set_argparse():
     # Subcommands
     subparsers = argparser.add_subparsers(
         # Dest means that the current subcommand can be accessed via args.subcommand
-        dest="subcommand"
+        dest="subcommand",
+        title="Subcommands",
         )
     # Subcommand: list-folders
     _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
