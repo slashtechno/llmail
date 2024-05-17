@@ -11,6 +11,7 @@ from openai import OpenAI
 from email.utils import getaddresses, parsedate_to_datetime, make_msgid
 from datetime import timezone
 import time
+import re
 
 
 from llmail.utils.cli_args import argparser
@@ -71,14 +72,12 @@ bot_email = None
 email_threads = {}
 
 
-
 def main():
     """Main entry point for the script."""
     global args
     global bot_email
     global email_threads
     args = argparser.parse_args()
-
 
     match args.subcommand:
         case "list-folders":
@@ -97,7 +96,7 @@ def main():
                 logger.info(f"Watching for new emails every {args.watch_interval} seconds")
                 while True:
                     fetch_and_process_emails(
-                        subject=args.subject_key,
+                        look_for_subject=args.subject_key,
                         alias=args.alias,
                         system_prompt=args.system_prompt,
                     )
@@ -106,15 +105,16 @@ def main():
                     email_threads = {}
             else:
                 fetch_and_process_emails(
-                    subject=args.subject_key,
+                    look_for_subject=args.subject_key,
                     alias=args.alias,
                     system_prompt=args.system_prompt,
                 )
 
+
 def fetch_and_process_emails(
-        subject: str,
-        alias: str = None,
-        system_prompt: str = None,
+    look_for_subject: str,
+    alias: str = None,
+    system_prompt: str = None,
 ):
     """Fetch and process emails from the IMAP server."""
     global email_threads
@@ -135,12 +135,23 @@ def fetch_and_process_emails(
                 logger.debug(f"Failed to select folder {folder[2]}. Skipping...")
                 continue
             # Might be smart to also search for forwarded emails
-            messages = client.search(["OR", "SUBJECT", subject, "SUBJECT", f"Re: {subject}"])
+            messages = client.search(
+                ["OR", "SUBJECT", look_for_subject, "SUBJECT", f"Re: {look_for_subject}"]
+            )
             for msg_id in messages:
                 # TODO: It seems this will throw a KeyError if an email is sent while this for loop is running. May have been fixed by emptying email_threads at the end of the while loop? This should be tested again to confirm
                 msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
+                # Use regex to verify that the subject optionally starts with "Fwd: " or "Re: " and then the intended subject (nothing case-sensitive)
+                # re.escape is used to escape any special characters in the subject
+                if not re.match(
+                    r"^(Fwd: ?|Re: ?)?" + re.escape(look_for_subject) + r"$", subject, re.IGNORECASE
+                ):
+                    logger.info(
+                        f"Skipping email with subject '{subject}' as it does not match the intended subject"
+                    )
+                    continue
                 timestamp = envelope.date
                 # Parse the headers from the email data
                 message = message_from_bytes(msg_data[msg_id][b"RFC822.HEADER"])
@@ -218,7 +229,9 @@ def fetch_and_process_emails(
                 msg_id = email_thread.initial_email.imap_id
                 references_ids = email_thread.initial_email.references
             elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender != bot_email:
-                logger.debug(f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}")
+                logger.debug(
+                    f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}"
+                )
                 message_id = email_thread.replies[-1].message_id
                 msg_id = email_thread.replies[-1].imap_id
                 references_ids = email_thread.replies[-1].references
@@ -424,7 +437,7 @@ def send_reply(
     # Set roles deletes the sender key so we need to store the sender before calling it
     sender = thread[-1]["sender"]
     thread = set_roles(thread)
-    if system_prompt:   
+    if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
     # thread_from_msg_id = get_thread_history(client, msg_id)
@@ -453,7 +466,9 @@ def send_reply(
         subject=f"Re: {subject}",
         headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
         contents=generated_response,
-        message_id=make_msgid(domain=args.message_id_domain if args.message_id_domain else "llmail"),
+        message_id=make_msgid(
+            domain=args.message_id_domain if args.message_id_domain else "llmail"
+        ),
     )
 
 

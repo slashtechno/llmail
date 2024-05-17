@@ -15,7 +15,6 @@ For reference, Gmail's IMAP settings are:
 """
 
 
-
 def set_argparse():
     global argparser
 
@@ -36,7 +35,7 @@ def set_argparse():
         # Dest means that the current subcommand can be accessed via args.subcommand
         dest="subcommand",
         title="Subcommands",
-        )
+    )
     # Subcommand: list-folders
     _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
     # General arguments
@@ -66,7 +65,9 @@ def set_argparse():
     ai_api.add_argument(
         "--openai-model",
         help="Model to use for the LLM",
-        default=os.getenv("OPENAI_MODEL") if os.getenv("OPENAI_MODEL") else "mistralai/mistral-7b-instruct:free",
+        default=os.getenv("OPENAI_MODEL")
+        if os.getenv("OPENAI_MODEL")
+        else "mistralai/mistral-7b-instruct:free",
     )
     ai_api.add_argument(
         "--system-prompt",
