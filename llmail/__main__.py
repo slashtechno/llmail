@@ -279,7 +279,7 @@ def fetch_and_process_emails(
                 model=args.openai_model,
             )
 
-        logger.info(f"Current number of email threads: {len(email_threads.keys())}")
+        logger.info (f"Current number of email threads: {len(email_threads.keys())}")
 
 
 # Function to check if an email has been read
