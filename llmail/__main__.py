@@ -1,9 +1,7 @@
 from email import message_from_bytes
 from email.message import Message
-from sys import stderr
 import yagmail
 import html2text
-from icecream import ic
 from imapclient import IMAPClient
 import imaplib
 from loguru import logger
