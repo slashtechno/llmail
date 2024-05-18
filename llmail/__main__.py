@@ -231,7 +231,7 @@ def fetch_and_process_emails(
                                 )
                             )
                             email_threads[parent_email_id] = email_thread
-                            logger.info(
+                            logger.debug(
                                 f"Created new thread for email {message_id} sent at {timestamp}"
                             )
 
@@ -279,7 +279,7 @@ def fetch_and_process_emails(
                 model=args.openai_model,
             )
 
-        logger.debug(f"Keys in email_threads: {len(email_threads.keys())}")
+        logger.info(f"Current number of email threads: {len(email_threads.keys())}")
 
 
 # Function to check if an email has been read

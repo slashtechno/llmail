@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "llmail"
-version = "0.2.3"
+version = "0.2.4"
 description = "Interact with LLMs via email"
 authors = ["slashtechno <77907286+slashtechno@users.noreply.github.com>"]
 repository = "https://github.com/slashtechno/llmail"
@@ -9,7 +9,7 @@ license = "GNU Affero General Public License v3"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10.0,<4.0.0"
 loguru = "^0.7.2"
 python-dotenv = "^1.0.1"
 imapclient = "^3.0.1"
