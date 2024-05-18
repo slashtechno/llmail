@@ -37,7 +37,9 @@ def set_argparse():
         title="Subcommands",
     )
     # Subcommand: list-folders
-    _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
+    _ = subparsers.add_parser(
+        "list-folders", help="List all folders in the IMAP account and exit"
+    )
     # General arguments
     argparser.add_argument(
         "--log-level",
@@ -46,11 +48,27 @@ def set_argparse():
         default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO",
     )
     argparser.add_argument(
+        "--redact-email-addresses",
+        help="Replace email addresses with '[redacted]' in logs",
+        action="store_true",
+        default=(
+            True
+            if (
+                os.getenv("REDACT_EMAIL_ADDRESSES")
+                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() == "true"
+                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() != "false"
+            )
+            else False
+        ),
+    )
+    argparser.add_argument(
         "--watch-interval",
         "-w",
         help="Interval in seconds to check for new emails. If not set, will only check once.",
         type=int,
-        default=int(os.getenv("WATCH_INTERVAL")) if os.getenv("WATCH_INTERVAL") else None,
+        default=(
+            int(os.getenv("WATCH_INTERVAL")) if os.getenv("WATCH_INTERVAL") else None
+        ),
     )
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
@@ -65,9 +83,11 @@ def set_argparse():
     ai_api.add_argument(
         "--openai-model",
         help="Model to use for the LLM",
-        default=os.getenv("OPENAI_MODEL")
-        if os.getenv("OPENAI_MODEL")
-        else "mistralai/mistral-7b-instruct:free",
+        default=(
+            os.getenv("OPENAI_MODEL")
+            if os.getenv("OPENAI_MODEL")
+            else "mistralai/mistral-7b-instruct:free"
+        ),
     )
     ai_api.add_argument(
         "--system-prompt",
@@ -88,7 +108,9 @@ def set_argparse():
         "--subject-key",
         "-s",
         help="Emails with this subject will be replied to",
-        default=os.getenv("SUBJECT_KEY") if os.getenv("SUBJECT_KEY") else "llmail autoreply",
+        default=(
+            os.getenv("SUBJECT_KEY") if os.getenv("SUBJECT_KEY") else "llmail autoreply"
+        ),
     )
     email.add_argument(
         "--alias",
@@ -96,8 +118,12 @@ def set_argparse():
         default=os.getenv("ALIAS") if os.getenv("ALIAS") else "LLMail",
     )
     imap = email.add_argument_group("IMAP")
-    imap.add_argument("--imap-host", help="IMAP server hostname", default=os.getenv("IMAP_HOST"))
-    imap.add_argument("--imap-port", help="IMAP server port", default=os.getenv("IMAP_PORT"))
+    imap.add_argument(
+        "--imap-host", help="IMAP server hostname", default=os.getenv("IMAP_HOST")
+    )
+    imap.add_argument(
+        "--imap-port", help="IMAP server port", default=os.getenv("IMAP_PORT")
+    )
     imap.add_argument(
         "--imap-username",
         help="IMAP server username",
@@ -109,8 +135,12 @@ def set_argparse():
         default=os.getenv("IMAP_PASSWORD"),
     )
     smtp = email.add_argument_group("SMTP")
-    smtp.add_argument("--smtp-host", help="SMTP server hostname", default=os.getenv("SMTP_HOST"))
-    smtp.add_argument("--smtp-port", help="SMTP server port", default=os.getenv("SMTP_PORT"))
+    smtp.add_argument(
+        "--smtp-host", help="SMTP server hostname", default=os.getenv("SMTP_HOST")
+    )
+    smtp.add_argument(
+        "--smtp-port", help="SMTP server port", default=os.getenv("SMTP_PORT")
+    )
     smtp.add_argument(
         "--smtp-username",
         help="SMTP server username",
@@ -124,7 +154,9 @@ def set_argparse():
     smtp.add_argument(
         "--message-id-domain",
         help="Domain to use for Message-ID header",
-        default=os.getenv("MESSAGE_ID_DOMAIN") if os.getenv("MESSAGE_ID_DOMAIN") else None,
+        default=(
+            os.getenv("MESSAGE_ID_DOMAIN") if os.getenv("MESSAGE_ID_DOMAIN") else None
+        ),
     )
 
     check_required_args(

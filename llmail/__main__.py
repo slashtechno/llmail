@@ -15,6 +15,7 @@ import re
 
 
 from llmail.utils.cli_args import argparser
+from llmail.utils.utils import set_primary_logger
 
 
 class EmailThread:
@@ -48,11 +49,15 @@ class EmailThread:
         # However, this **significantly** reduces complexity so for now, it's fine
 
     def __repr__(self):
-        return f"EmailThread(initial_email={self.initial_email}, replies={self.replies})"
+        return (
+            f"EmailThread(initial_email={self.initial_email}, replies={self.replies})"
+        )
 
 
 class Email:
-    def __init__(self, imap_id, message_id, subject, sender, timestamp, body, references):
+    def __init__(
+        self, imap_id, message_id, subject, sender, timestamp, body, references
+    ):
         self.imap_id = imap_id
         self.message_id = message_id
         self.subject = subject
@@ -90,10 +95,12 @@ def main():
             bot_email = args.imap_username
 
             # Set up logging
-            set_primary_logger(args.log_level)
-            ic(args)
+            set_primary_logger(args.log_level, args.redact_email_addresses)
+            logger.debug(args)
             if args.watch_interval:
-                logger.info(f"Watching for new emails every {args.watch_interval} seconds")
+                logger.info(
+                    f"Watching for new emails every {args.watch_interval} seconds"
+                )
                 while True:
                     fetch_and_process_emails(
                         look_for_subject=args.subject_key,
@@ -123,7 +130,11 @@ def fetch_and_process_emails(
         client.login(args.imap_username, args.imap_password)
 
         email_threads = {}
-        folders = args.folder if args.folder else [folder[2] for folder in client.list_folders()]
+        folders = (
+            args.folder
+            if args.folder
+            else [folder[2] for folder in client.list_folders()]
+        )
         # for folder in client.list_folders():
         # Disabling fetching from all folders due it not being inefficient
         # Instead, just fetch from INBOX and get the threads later
@@ -136,19 +147,29 @@ def fetch_and_process_emails(
                 continue
             # Might be smart to also search for forwarded emails
             messages = client.search(
-                ["OR", "SUBJECT", look_for_subject, "SUBJECT", f"Re: {look_for_subject}"]
+                [
+                    "OR",
+                    "SUBJECT",
+                    look_for_subject,
+                    "SUBJECT",
+                    f"Re: {look_for_subject}",
+                ]
             )
             for msg_id in messages:
                 # TODO: It seems this will throw a KeyError if an email is sent while this for loop is running. May have been fixed by emptying email_threads at the end of the while loop? This should be tested again to confirm
-                msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
+                msg_data = client.fetch(
+                    [msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"]
+                )
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
                 # Use regex to verify that the subject optionally starts with "Fwd: " or "Re: " and then the intended subject (nothing case-sensitive)
                 # re.escape is used to escape any special characters in the subject
                 if not re.match(
-                    r"^(Fwd: ?|Re: ?)?" + re.escape(look_for_subject) + r"$", subject, re.IGNORECASE
+                    r"^(Fwd: ?|Re: ?)*" + re.escape(look_for_subject) + r"$",
+                    subject,
+                    re.IGNORECASE,
                 ):
-                    logger.info(
+                    logger.warning(
                         f"Skipping email with subject '{subject}' as it does not match the intended subject"
                     )
                     continue
@@ -216,8 +237,7 @@ def fetch_and_process_emails(
                                 f"Created new thread for email {message_id} sent at {timestamp}"
                             )
 
-        # ic([thread for thread in email_threads.values()])
-        ic(email_threads)
+        logger.debug(email_threads)
         # Check if there are any emails wherein the last email in the thread is a user email
         # If so, send a reply
         for message_id, email_thread in email_threads.items():
@@ -228,15 +248,23 @@ def fetch_and_process_emails(
                 message_id = email_thread.initial_email.message_id
                 msg_id = email_thread.initial_email.imap_id
                 references_ids = email_thread.initial_email.references
-            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender != bot_email:
+            elif (
+                len(email_thread.replies) > 0
+                and email_thread.replies[-1].sender != bot_email
+            ):
                 logger.debug(
                     f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}"
                 )
                 message_id = email_thread.replies[-1].message_id
                 msg_id = email_thread.replies[-1].imap_id
                 references_ids = email_thread.replies[-1].references
-            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender == bot_email:
-                logger.debug(f"Last email in thread for email {message_id} is from the bot")
+            elif (
+                len(email_thread.replies) > 0
+                and email_thread.replies[-1].sender == bot_email
+            ):
+                logger.debug(
+                    f"Last email in thread for email {message_id} is from the bot"
+                )
                 continue
             else:
                 ValueError("Invalid email thread")
@@ -289,7 +317,11 @@ def get_thread_history(
         )
         for email in message_identifier.replies:
             thread_history.append(
-                {"sender": email.sender, "content": email.body, "timestamp": email.timestamp}
+                {
+                    "sender": email.sender,
+                    "content": email.body,
+                    "timestamp": email.timestamp,
+                }
             )
         return thread_history
     elif isinstance(message_identifier, int) or isinstance(message_identifier, str):
@@ -335,7 +367,9 @@ def get_thread_history(
                 {
                     "sender": get_sender(message)["email"],
                     "content": get_plain_email_content(message),
-                    "timestamp": make_tz_aware(parsedate_to_datetime(message.get("Date"))),
+                    "timestamp": make_tz_aware(
+                        parsedate_to_datetime(message.get("Date"))
+                    ),
                 }
             )
             message = prev_message
@@ -343,7 +377,9 @@ def get_thread_history(
         thread_history = sorted(thread_history, key=lambda x: x["timestamp"])
         return thread_history
     else:
-        raise TypeError("Invalid type for message. Must be an int, str, or EmailThread object.")
+        raise TypeError(
+            "Invalid type for message. Must be an int, str, or EmailThread object."
+        )
 
 
 def get_sender(message: Message) -> dict:
@@ -365,7 +401,9 @@ def get_top_level_email(client, msg_id, message_id=None):
 
     # Extract the References header and split it into individual message IDs
     references_header = headers.get("References", "")
-    references_ids = [m_id.strip() for m_id in references_header.split() if m_id.strip()]
+    references_ids = [
+        m_id.strip() for m_id in references_header.split() if m_id.strip()
+    ]
 
     # Extract the first message ID, which represents the top-level email in the thread
     # If it doesn't exist, use the current message ID. Not msg_id since msg_id is only for IMAP
@@ -413,14 +451,6 @@ def get_uid_from_message_id(imap_client, message_id):
     return None
 
 
-def set_primary_logger(log_level):
-    """Set up the primary logger with the specified log level. Output to stderr and use the format specified."""
-    logger.remove()
-    # ^10 is a formatting directive to center with a padding of 10
-    logger_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> |<level>{level: ^10}</level>| <level>{message}</level>"
-    logger.add(stderr, format=logger_format, colorize=True, level=log_level)
-
-
 def send_reply(
     thread: list[dict],
     subject: str,
@@ -440,15 +470,6 @@ def send_reply(
     if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
-    # thread_from_msg_id = get_thread_history(client, msg_id)
-    # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
-    # logger.debug(f"Thread history length (message_identifier): {len(thread_from_msg_id)}")
-    # thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
-    # logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
-    # logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
-    logger.info(f"Sending reply to email {message_id} to {sender}")
-    logger.debug(f"Thread history: {thread}")
-    logger.debug(f"Thread history length: {len(thread)}")
     generated_response = openai.chat.completions.create(
         model=model,
         messages=thread,
@@ -463,6 +484,7 @@ def send_reply(
     )
     yag.send(
         to=sender,
+        # subject=f"Re: {subject}" if not subject.startswith("Re: ") else subject,
         subject=f"Re: {subject}",
         headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
         contents=generated_response,
@@ -470,6 +492,15 @@ def send_reply(
             domain=args.message_id_domain if args.message_id_domain else "llmail"
         ),
     )
+    # thread_from_msg_id = get_thread_history(client, msg_id)
+    # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
+    # logger.debug(f"Thread history length (message_identifier): {len(thread_from_msg_id)}")
+    # thread_from_object = get_thread_history(client, email_threads[list(email_threads.keys())[-1]])
+    # logger.debug(f"Thread history (EmailThread object): {thread_from_object}")
+    # logger.debug(f"Thread history length (EmailThread object): {len(thread_from_object)}")
+    logger.info(f"Sending reply to email {message_id} to {sender}")
+    logger.debug(f"Thread history: {thread}")
+    logger.debug(f"Thread history length: {len(thread)}")
 
 
 def get_plain_email_content(message: Message | str) -> str:
@@ -485,15 +516,25 @@ def get_plain_email_content(message: Message | str) -> str:
                 try:
                     body = part.get_payload(decode=True)
                 except UnicodeDecodeError:
-                    logger.debug("UnicodeDecodeError occurred. Trying to get payload as string.")
+                    logger.debug(
+                        "UnicodeDecodeError occurred. Trying to get payload as string."
+                    )
                     body = str(part.get_payload())
                 if content_type == "text/plain":
-                    markdown = html2text.html2text(str(body.decode("unicode_escape"))).strip()
+                    markdown = html2text.html2text(
+                        str(body.decode("unicode_escape"))
+                    ).strip()
                     # logger.debug(f"Converted to markdown: {markdown}")
+                    # if len(markdown) < 5:
+                    #     logger.warning(
+                    #         f"Content is less than 5 characters | Content: {markdown}"
+                    #     )
                     return markdown
         else:
             logger.debug("Message is not multipart. Getting payload as string.")
             body = message.get_payload(decode=True).decode()
+            # if len(body) < 5:
+            #     logger.warning(f"Content is less than 5 characters | Content: {body}")
             return html2text.html2text(str(body.decode("unicode_escape")))
 
 
