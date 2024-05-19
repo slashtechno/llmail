@@ -10,6 +10,7 @@ from email.utils import getaddresses, parsedate_to_datetime, make_msgid
 from datetime import timezone
 import time
 import re
+from ssl import SSLError
 
 
 from llmail.utils.cli_args import argparser
@@ -95,6 +96,7 @@ def main():
             # Set up logging
             set_primary_logger(args.log_level, args.redact_email_addresses)
             logger.debug(args)
+            logger.info(f"Looking for emails that match the subject key \"{args.subject_key}\"")
             if args.watch_interval:
                 logger.info(
                     f"Watching for new emails every {args.watch_interval} seconds"
@@ -480,16 +482,42 @@ def send_reply(
         host=args.smtp_host,
         port=int(args.smtp_port),
     )
-    yag.send(
-        to=sender,
-        # subject=f"Re: {subject}" if not subject.startswith("Re: ") else subject,
-        subject=f"Re: {subject}",
-        headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
-        contents=generated_response,
-        message_id=make_msgid(
-            domain=args.message_id_domain if args.message_id_domain else "llmail"
-        ),
-    )
+    try:
+        yag.send(
+            to=sender,
+            subject=f"Re: {subject}" if not subject.startswith("Re: ") else subject,
+            # subject=f"Re: {subject}",
+            headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
+            contents=generated_response,
+            message_id=make_msgid(
+                domain=args.message_id_domain if args.message_id_domain else "llmail"
+            ),
+        )
+    except SSLError as e:
+        if "WRONG_VERSION_NUMBER" in str(e):
+            logger.info(
+                "SSL error occurred. Trying to connect with starttls=True instead."
+            )
+            yag = yagmail.SMTP(
+                user={args.smtp_username: alias} if alias else args.smtp_username,
+                password=args.smtp_password,
+                host=args.smtp_host,
+                port=int(args.smtp_port),
+                smtp_starttls=True,
+                smtp_ssl=False
+            )
+            yag.send(
+                to=sender,
+                subject=f"Re: {subject}" if not subject.startswith("Re: ") else subject,
+                # subject=f"Re: {subject}",
+                headers={"In-Reply-To": message_id, "References": " ".join(references_ids)},
+                contents=generated_response,
+                message_id=make_msgid(
+                    domain=args.message_id_domain if args.message_id_domain else "llmail"
+                ),
+            )
+        else:
+            raise e
     # thread_from_msg_id = get_thread_history(client, msg_id)
     # logger.debug(f"Thread history (message_identifier): {thread_from_msg_id}")
     # logger.debug(f"Thread history length (message_identifier): {len(thread_from_msg_id)}")
