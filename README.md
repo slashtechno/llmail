@@ -1,5 +1,7 @@
 # LLMail  
 Interact with Large Language Models (LLMs) via email.
+[![Watch the video](https://img.youtube.com/vi/0YHQaxvxGoI/maxresdefault.jpg)](https://youtu.be/0YHQaxvxGoI)
+
 
 ### Features  
 - Utilize any OpenAI-compatible API with any available model
