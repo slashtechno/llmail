@@ -174,6 +174,7 @@ def set_argparse():
         argparser,
     )
     args = argparser.parse_args()
+    # Setting bot_email instead of using imap_username directly in case support is needed for imap_username and bot_email being different
     global bot_email 
     bot_email = args.imap_username
 

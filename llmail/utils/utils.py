@@ -5,7 +5,6 @@ import html2text
 
 from llmail.utils import logger
 
-
 def make_tz_aware(timestamp):
     # dt = parsedate_to_datetime(timestamp)
     dt = timestamp
