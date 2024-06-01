@@ -5,11 +5,11 @@ import html2text
 
 from llmail.utils import logger
 
+
 def make_tz_aware(timestamp):
     # dt = parsedate_to_datetime(timestamp)
     dt = timestamp
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
-
 
 
 def get_plain_email_content(message: Message | str) -> str:
@@ -25,14 +25,10 @@ def get_plain_email_content(message: Message | str) -> str:
                 try:
                     body = part.get_payload(decode=True)
                 except UnicodeDecodeError:
-                    logger.debug(
-                        "UnicodeDecodeError occurred. Trying to get payload as string."
-                    )
+                    logger.debug("UnicodeDecodeError occurred. Trying to get payload as string.")
                     body = str(part.get_payload())
                 if content_type == "text/plain":
-                    markdown = html2text.html2text(
-                        str(body.decode("unicode_escape"))
-                    ).strip()
+                    markdown = html2text.html2text(str(body.decode("unicode_escape"))).strip()
                     # logger.debug(f"Converted to markdown: {markdown}")
                     # if len(markdown) < 5:
                     #     logger.warning(
@@ -45,4 +41,3 @@ def get_plain_email_content(message: Message | str) -> str:
             # if len(body) < 5:
             #     logger.warning(f"Content is less than 5 characters | Content: {body}")
             return html2text.html2text(str(body.decode("unicode_escape")))
-

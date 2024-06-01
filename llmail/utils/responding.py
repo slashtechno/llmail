@@ -10,12 +10,15 @@ from openai import OpenAI
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
 from llmail.utils import logger, args, bot_email
+
 # Import files from utils/
 from llmail.utils import tracking
+
 # Import utilites from utils/utils.py
 from llmail.utils.utils import get_plain_email_content
 
 email_threads = {}
+
 
 def fetch_and_process_emails(
     look_for_subject: str,
@@ -29,11 +32,7 @@ def fetch_and_process_emails(
         client.login(args.imap_username, args.imap_password)
 
         email_threads = {}
-        folders = (
-            args.folder
-            if args.folder
-            else [folder[2] for folder in client.list_folders()]
-        )
+        folders = args.folder if args.folder else [folder[2] for folder in client.list_folders()]
         # for folder in client.list_folders():
         # Disabling fetching from all folders due it not being inefficient
         # Instead, just fetch from INBOX and get the threads later
@@ -56,9 +55,7 @@ def fetch_and_process_emails(
             )
             for msg_id in messages:
                 # It seems this will throw a KeyError if an email is sent while this for loop is running. However, I think the real cause is when an email is deleted (via another client) while testing the code
-                msg_data = client.fetch(
-                    [msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"]
-                )
+                msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
                 # Use regex to verify that the subject optionally starts with "Fwd: " or "Re: " and then the intended subject (nothing case-sensitive)
@@ -147,23 +144,15 @@ def fetch_and_process_emails(
                 message_id = email_thread.initial_email.message_id
                 msg_id = email_thread.initial_email.imap_id
                 references_ids = email_thread.initial_email.references
-            elif (
-                len(email_thread.replies) > 0
-                and email_thread.replies[-1].sender != bot_email
-            ):
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender != bot_email:
                 logger.debug(
                     f"Last email in thread for email {message_id} is from {email_thread.replies[-1].sender}"
                 )
                 message_id = email_thread.replies[-1].message_id
                 msg_id = email_thread.replies[-1].imap_id
                 references_ids = email_thread.replies[-1].references
-            elif (
-                len(email_thread.replies) > 0
-                and email_thread.replies[-1].sender == bot_email
-            ):
-                logger.debug(
-                    f"Last email in thread for email {message_id} is from the bot"
-                )
+            elif len(email_thread.replies) > 0 and email_thread.replies[-1].sender == bot_email:
+                logger.debug(f"Last email in thread for email {message_id} is from the bot")
                 continue
             else:
                 ValueError("Invalid email thread")
@@ -180,7 +169,7 @@ def fetch_and_process_emails(
                 model=args.openai_model,
             )
 
-        logger.info (f"Current number of email threads: {len(email_threads.keys())}")
+        logger.info(f"Current number of email threads: {len(email_threads.keys())}")
 
 
 def send_reply(
@@ -202,10 +191,14 @@ def send_reply(
     if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
-    generated_response = openai.chat.completions.create(
-        model=model,
-        messages=thread,
-    ).choices[0].message.content
+    generated_response = (
+        openai.chat.completions.create(
+            model=model,
+            messages=thread,
+        )
+        .choices[0]
+        .message.content
+    )
     logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
         user={args.smtp_username: alias} if alias else args.smtp_username,
@@ -226,16 +219,14 @@ def send_reply(
         )
     except SSLError as e:
         if "WRONG_VERSION_NUMBER" in str(e):
-            logger.info(
-                "SSL error occurred. Trying to connect with starttls=True instead."
-            )
+            logger.info("SSL error occurred. Trying to connect with starttls=True instead.")
             yag = yagmail.SMTP(
                 user={args.smtp_username: alias} if alias else args.smtp_username,
                 password=args.smtp_password,
                 host=args.smtp_host,
                 port=int(args.smtp_port),
                 smtp_starttls=True,
-                smtp_ssl=False
+                smtp_ssl=False,
             )
             yag.send(
                 to=sender,
@@ -258,7 +249,6 @@ def send_reply(
     logger.info(f"Sending reply to email {message_id} to {sender}")
     logger.debug(f"Thread history: {thread}")
     logger.debug(f"Thread history length: {len(thread)}")
-
 
 
 def set_roles(thread_history: list[dict]) -> list[dict]:

@@ -1,8 +1,6 @@
-
 import time
 from imapclient import IMAPClient
 from llmail.utils import logger, args, responding
-
 
 
 def main():
@@ -16,11 +14,9 @@ def main():
                     print(folder[2])
         case None:
             logger.debug(args)
-            logger.info(f"Looking for emails that match the subject key \"{args.subject_key}\"")
+            logger.info(f'Looking for emails that match the subject key "{args.subject_key}"')
             if args.watch_interval:
-                logger.info(
-                    f"Watching for new emails every {args.watch_interval} seconds"
-                )
+                logger.info(f"Watching for new emails every {args.watch_interval} seconds")
                 while True:
                     responding.fetch_and_process_emails(
                         look_for_subject=args.subject_key,
@@ -36,8 +32,6 @@ def main():
                     alias=args.alias,
                     system_prompt=args.system_prompt,
                 )
-
-
 
 
 if __name__ == "__main__":

@@ -43,15 +43,11 @@ class EmailThread:
         # However, this **significantly** reduces complexity so for now, it's fine
 
     def __repr__(self):
-        return (
-            f"EmailThread(initial_email={self.initial_email}, replies={self.replies})"
-        )
+        return f"EmailThread(initial_email={self.initial_email}, replies={self.replies})"
 
 
 class Email:
-    def __init__(
-        self, imap_id, message_id, subject, sender, timestamp, body, references
-    ):
+    def __init__(self, imap_id, message_id, subject, sender, timestamp, body, references):
         self.imap_id = imap_id
         self.message_id = message_id
         self.subject = subject
@@ -148,9 +144,7 @@ def get_thread_history(
                 {
                     "sender": get_sender(message)["email"],
                     "content": get_plain_email_content(message),
-                    "timestamp": make_tz_aware(
-                        parsedate_to_datetime(message.get("Date"))
-                    ),
+                    "timestamp": make_tz_aware(parsedate_to_datetime(message.get("Date"))),
                 }
             )
             message = prev_message
@@ -158,9 +152,7 @@ def get_thread_history(
         thread_history = sorted(thread_history, key=lambda x: x["timestamp"])
         return thread_history
     else:
-        raise TypeError(
-            "Invalid type for message. Must be an int, str, or EmailThread object."
-        )
+        raise TypeError("Invalid type for message. Must be an int, str, or EmailThread object.")
 
 
 def get_sender(message: Message) -> dict:
@@ -182,9 +174,7 @@ def get_top_level_email(client, msg_id, message_id=None):
 
     # Extract the References header and split it into individual message IDs
     references_header = headers.get("References", "")
-    references_ids = [
-        m_id.strip() for m_id in references_header.split() if m_id.strip()
-    ]
+    references_ids = [m_id.strip() for m_id in references_header.split() if m_id.strip()]
 
     # Extract the first message ID, which represents the top-level email in the thread
     # If it doesn't exist, use the current message ID. Not msg_id since msg_id is only for IMAP
