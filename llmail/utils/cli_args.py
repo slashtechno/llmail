@@ -1,10 +1,9 @@
 import argparse
 import os
-import dotenv
 import sys
 from pathlib import Path
 
-argparser = None
+import dotenv
 
 """
 For reference, Gmail's IMAP settings are:
@@ -16,7 +15,7 @@ For reference, Gmail's IMAP settings are:
 
 
 def set_argparse():
-    global argparser
+    global args
 
     if Path(".env").is_file():
         dotenv.load_dotenv()
@@ -174,6 +173,9 @@ def set_argparse():
         ],
         argparser,
     )
+    args = argparser.parse_args()
+    global bot_email 
+    bot_email = args.imap_username
 
 
 def check_required_args(required_args: list[str], argparser: argparse.ArgumentParser):
