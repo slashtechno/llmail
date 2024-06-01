@@ -7,6 +7,9 @@ from ssl import SSLError
 import yagmail
 from imapclient import IMAPClient
 from openai import OpenAI
+from phi.assistant import Assistant
+from phi.llm.openai.like import OpenAILike
+
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
 from llmail.utils import logger, args, bot_email
@@ -164,9 +167,14 @@ def fetch_and_process_emails(
                 msg_id=msg_id,
                 message_id=message_id,
                 references_ids=references_ids,
-                openai=openai,
+                assistant=Assistant(
+                    llm=OpenAILike(
+                        model=args.openai_model,
+                        api_key=openai.api_key,
+                        base_url=args.openai_base_url,
+                    )
+                ),
                 system_prompt=system_prompt,
-                model=args.openai_model,
             )
 
         logger.info(f"Current number of email threads: {len(email_threads.keys())}")
@@ -180,9 +188,8 @@ def send_reply(
     msg_id: int,
     message_id: str,
     references_ids: list[str],
-    openai: OpenAI,
+    assistant: Assistant,
     system_prompt: str,
-    model: str,
 ):
     """Send a reply to the email with the specified message ID."""
     # Set roles deletes the sender key so we need to store the sender before calling it
@@ -191,13 +198,8 @@ def send_reply(
     if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
-    generated_response = (
-        openai.chat.completions.create(
-            model=model,
-            messages=thread,
-        )
-        .choices[0]
-        .message.content
+    generated_response = assistant.run(
+        messages=thread, stream=False
     )
     logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
