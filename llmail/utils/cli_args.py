@@ -59,6 +59,11 @@ def set_argparse():
         ),
     )
     argparser.add_argument(
+        "--exa-api-key",
+        help="Exa API key",
+        default=os.getenv("EXA_API_KEY") if os.getenv("EXA_API_KEY") else None,
+    )
+    argparser.add_argument(
         "--watch-interval",
         "-w",
         help="Interval in seconds to check for new emails. If not set, will only check once.",
@@ -68,19 +73,25 @@ def set_argparse():
     # OpenAI-compatible API arguments
     ai_api = argparser.add_argument_group("OpenAI-compatible API")
     ai_api.add_argument(
-        "--openai-api-key", help="OpenAI API key", default=os.getenv("OPENAI_API_KEY")
+        "--llm-provider",
+        help="LLM provider provider",
+        choices=["openai-like", "ollama"],
+        default=os.getenv("LLM_PROVIDER") if os.getenv("LLM_PROVIDER") else "openai-like",
     )
     ai_api.add_argument(
-        "--openai-base-url",
-        help="OpenAI API endpoint",
-        default=os.getenv("OPENAI_BASE_URL"),
+        "--llm-api-key", help="LLM provider API key", default=os.getenv("LLM_API_KEY")
     )
     ai_api.add_argument(
-        "--openai-model",
+        "--llm-base-url",
+        help="Base URL for the LLM provider",
+        default=os.getenv("LLM_BASE_URL"),
+    )
+    ai_api.add_argument(
+        "--llm-model",
         help="Model to use for the LLM",
         default=(
-            os.getenv("OPENAI_MODEL")
-            if os.getenv("OPENAI_MODEL")
+            os.getenv("LLM_MODEL")
+            if os.getenv("LLM_MODEL")
             else "mistralai/mistral-7b-instruct:free"
         ),
     )
@@ -89,6 +100,21 @@ def set_argparse():
         help="Prepend this to the message history sent to the LLM as a message from the system role",
         default=os.getenv("SYSTEM_PROMPT") if os.getenv("SYSTEM_PROMPT") else None,
     )
+    ai_api.add_argument(
+        "--no-tools",
+        help="Do not use any tools via function calling",
+        action="store_true",
+        default=(
+            True
+            if (
+                os.getenv("NO_TOOLS")
+                and os.getenv("NO_TOOLS").lower() == "true"
+                and os.getenv("NO_TOOLS").lower() != "false"
+            )
+            else False
+        ),
+    )
+
     # Email arguments
     email = argparser.add_argument_group("Email")
     email.add_argument(
@@ -152,8 +178,8 @@ def set_argparse():
             "smtp_port",
             "smtp_username",
             "smtp_password",
-            "openai_api_key",
-            "openai_base_url",
+            # "llm_api_key",
+            # "llm_base_url",
         ],
         argparser,
     )

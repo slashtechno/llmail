@@ -19,6 +19,9 @@ html2text = "^2024.2.26"
 openai = "^1.25.1"
 phidata = "^2.4.17"
 duckduckgo-search = "^6.1.4"
+exa-py = "^1.0.12"
+ollama = "^0.2.0"
+beautifulsoup4 = "^4.12.3"
 
 
 [tool.poetry.group.dev.dependencies]

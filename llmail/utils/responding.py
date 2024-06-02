@@ -6,9 +6,12 @@ from ssl import SSLError
 
 import yagmail
 from imapclient import IMAPClient
-from openai import OpenAI
 from phi.assistant import Assistant
 from phi.llm.openai.like import OpenAILike
+from phi.tools.duckduckgo import DuckDuckGo
+from phi.llm.ollama import Ollama
+from phi.tools.exa import ExaTools
+from phi.tools.website import WebsiteTools
 
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
@@ -30,7 +33,6 @@ def fetch_and_process_emails(
 ):
     """Fetch and process emails from the IMAP server."""
     global email_threads
-    openai = OpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
     with IMAPClient(args.imap_host) as client:
         client.login(args.imap_username, args.imap_password)
 
@@ -159,6 +161,39 @@ def fetch_and_process_emails(
                 continue
             else:
                 ValueError("Invalid email thread")
+            # Select tools
+            tools = [
+                WebsiteTools(),
+                DuckDuckGo(search=True, news=True)
+            ]
+            # if args.exa_api_key is not None:
+            #     tools.append(ExaTools(api_key=args.exa_api_key, use_autoprompt=True, highlights=True))
+            if args.no_tools:
+                tools = []
+            # Chose how to send the request to the provider
+            match args.llm_provider:
+                case "openai-like":
+                    llm = OpenAILike(
+                        model=args.llm_model,
+                        api_key=args.llm_api_key,
+                        base_url=args.llm_base_url,
+                    )
+                case "ollama":
+                    llm = Ollama(
+                        model=args.llm_model,
+                        host=args.llm_base_url,
+                    )
+            assistant = Assistant(
+                llm=llm,
+                tools=tools,
+                show_tool_calls=False,
+                # additional_messages=[
+                #     {
+                #         "role": "system",
+                #         "content": "Functions generally need arguments. Only provide your final iteration to the user. For example, if you're searching for a website, don't tell the user that you're searching for the website. Just provide the final result. Remember, the user is only going to see the final response, not the steps you took to get there. Only provide the final result. Try to use the most appropriate tool for the task. For example, if the user asks about a website, try searching for it and scraping it too. For URLs, ensure the protocol is included (e.g. https://). Use the functions to ensure that the information is accurate and up-to-date",
+                #     },
+                # ],
+            )
             send_reply(
                 thread=tracking.get_thread_history(client, email_thread),
                 subject=subject,
@@ -167,13 +202,7 @@ def fetch_and_process_emails(
                 msg_id=msg_id,
                 message_id=message_id,
                 references_ids=references_ids,
-                assistant=Assistant(
-                    llm=OpenAILike(
-                        model=args.openai_model,
-                        api_key=openai.api_key,
-                        base_url=args.openai_base_url,
-                    )
-                ),
+                assistant=assistant,
                 system_prompt=system_prompt,
             )
 
@@ -198,9 +227,7 @@ def send_reply(
     if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
-    generated_response = assistant.run(
-        messages=thread, stream=False
-    )
+    generated_response = assistant.run(messages=thread, stream=False)
     logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
         user={args.smtp_username: alias} if alias else args.smtp_username,

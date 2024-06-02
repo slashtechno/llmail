@@ -14,6 +14,15 @@
             "justMyCode": true
         },
         {
+            "name": "(Full) Debug without args",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "llmail",
+            "args": [
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Debug with custom folder",
             "type": "debugpy",
             "request": "launch",
