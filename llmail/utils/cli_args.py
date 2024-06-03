@@ -77,12 +77,12 @@ def set_argparse():
         help="Exa API key for searching with Exa (disables DuckDuckGo)",
         default=os.getenv("EXA_API_KEY") if os.getenv("EXA_API_KEY") else None,
     )
-    ai.add_argument(
-        "--scrapable-url",
-        help="URL(s) that can be scraped for information",
-        default=(os.getenv("SCRAPABLE_URL").split(",") if os.getenv("SCRAPABLE_URL") else None),
-        action="append",
-    )
+    # ai.add_argument(
+    #     "--scrapable-url",
+    #     help="URL(s) that can be scraped for information",
+    #     default=(os.getenv("SCRAPABLE_URL").split(",") if os.getenv("SCRAPABLE_URL") else None),
+    #     action="append",
+    # )
     ai.add_argument(
         "--no-tools",
         help="Do not use any tools via function calling",

@@ -12,8 +12,8 @@ from phi.tools.duckduckgo import DuckDuckGo
 from phi.llm.ollama import Ollama
 from phi.tools.exa import ExaTools
 from phi.tools.website import WebsiteTools
-from phi.knowledge.website import WebsiteKnowledgeBase
-from phi.knowledge.combined import CombinedKnowledgeBase
+# from phi.knowledge.website import WebsiteKnowledgeBase
+# from phi.knowledge.combined import CombinedKnowledgeBase
 import ollama
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
@@ -164,11 +164,13 @@ def fetch_and_process_emails(
             else:
                 ValueError("Invalid email thread")
             # Select tools
-            website_knowledge_base = WebsiteKnowledgeBase(
-                urls=args.scrapable_url if args.scrapable_url else []
-            )
+            # website_knowledge_base = WebsiteKnowledgeBase(
+            #     urls=args.scrapable_url if args.scrapable_url else []
+            # )
             tools = [
-                WebsiteTools(knowledge_base=website_knowledge_base),
+                # Giving WebsiteTools the knowledge base seems to allow it to add URLs to the knowledge base
+                # WebsiteTools(knowledge_base=website_knowledge_base),
+                WebsiteTools(),
                 DuckDuckGo(search=True, news=True),
             ]
             if args.exa_api_key is not None:
@@ -211,11 +213,11 @@ def fetch_and_process_emails(
                 tool_call_limit=10,
                 debug_mode=args.phidata_debug,
                 prevent_hallucinations=True,
-                knowledge_base=CombinedKnowledgeBase(
-                    sources=[
-                        website_knowledge_base,
-                    ]
-                ),
+                # knowledge_base=CombinedKnowledgeBase(
+                #     sources=[
+                #         website_knowledge_base,
+                #     ]
+                # ),
             )
             send_reply(
                 thread=tracking.get_thread_history(client, email_thread),
