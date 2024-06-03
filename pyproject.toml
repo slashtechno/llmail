@@ -1,12 +1,18 @@
+# I think PDM uses a standard pyproject.toml file so it might be a good idea to eventually migrate to that
+# https://pdm-project.org/
 [tool.poetry]
 name = "llmail"
-version = "0.2.5"
+version = "0.3.0"
 description = "Interact with LLMs via email"
 authors = ["slashtechno <77907286+slashtechno@users.noreply.github.com>"]
 repository = "https://github.com/slashtechno/llmail"
 keywords = ["llm", "email", "ai", "openai"]
 license = "GNU Affero General Public License v3"
 readme = "README.md"
+classifiers = [
+"License :: OSI Approved :: GNU Affero General Public License v3",
+"Programming Language :: Python",
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10.0,<4.0.0"
