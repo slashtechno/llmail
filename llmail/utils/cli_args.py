@@ -39,26 +39,6 @@ def set_argparse():
     _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
     # General arguments
     argparser.add_argument(
-        "--log-level",
-        "-l",
-        help="Log level",
-        default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO",
-    )
-    argparser.add_argument(
-        "--redact-email-addresses",
-        help="Replace email addresses with '[redacted]' in logs",
-        action="store_true",
-        default=(
-            True
-            if (
-                os.getenv("REDACT_EMAIL_ADDRESSES")
-                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() == "true"
-                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() != "false"
-            )
-            else False
-        ),
-    )
-    argparser.add_argument(
         "--exa-api-key",
         help="Exa API key",
         default=os.getenv("EXA_API_KEY") if os.getenv("EXA_API_KEY") else None,
@@ -168,6 +148,42 @@ def set_argparse():
         default=(os.getenv("MESSAGE_ID_DOMAIN") if os.getenv("MESSAGE_ID_DOMAIN") else None),
     )
 
+    # Debuggiongm arguments
+    debug = argparser.add_argument_group("Debugging")
+    debug.add_argument(
+        "--log-level",
+        "-l",
+        help="Log level",
+        default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO",
+    )
+    debug.add_argument(
+        "--redact-email-addresses",
+        help="Replace email addresses with '[redacted]' in logs",
+        action="store_true",
+        default=(
+            True
+            if (
+                os.getenv("REDACT_EMAIL_ADDRESSES")
+                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() == "true"
+                and os.getenv("REDACT_EMAIL_ADDRESSES").lower() != "false"
+            )
+            else False
+        ),
+    )
+    debug.add_argument(
+        "--show-tool-calls",
+        help="Pass show_tool_calls=True to phidata",
+        action="store_true",
+        default=(
+            True
+            if (
+                os.getenv("SHOW_TOOL_CALLS")
+                and os.getenv("SHOW_TOOL_CALLS").lower() == "true"
+                and os.getenv("SHOW_TOOL_CALLS").lower() != "false"
+            )
+            else False
+        ),
+    )
     check_required_args(
         [
             "imap_host",
