@@ -39,14 +39,9 @@ def set_argparse():
     _ = subparsers.add_parser("list-folders", help="List all folders in the IMAP account and exit")
     # General arguments
     argparser.add_argument(
-        "--exa-api-key",
-        help="Exa API key",
-        default=os.getenv("EXA_API_KEY") if os.getenv("EXA_API_KEY") else None,
-    )
-    argparser.add_argument(
         "--watch-interval",
         "-w",
-        help="Interval in seconds to check for new emails. If not set, will only check once.",
+        help="Interval in seconds to check for new emails. If set to 0, will only check once.",
         type=int,
         default=(int(os.getenv("WATCH_INTERVAL")) if os.getenv("WATCH_INTERVAL") else None),
     )
@@ -75,12 +70,20 @@ def set_argparse():
             else "mistralai/mistral-7b-instruct:free"
         ),
     )
-    ai_api.add_argument(
-        "--system-prompt",
-        help="Prepend this to the message history sent to the LLM as a message from the system role",
-        default=os.getenv("SYSTEM_PROMPT") if os.getenv("SYSTEM_PROMPT") else None,
+    # AI-related arguments
+    ai = argparser.add_argument_group("AI")
+    argparser.add_argument(
+        "--exa-api-key",
+        help="Exa API key for searching with Exa (disables DuckDuckGo)",
+        default=os.getenv("EXA_API_KEY") if os.getenv("EXA_API_KEY") else None,
     )
-    ai_api.add_argument(
+    ai.add_argument(
+        "--scrapable-url",
+        help="URL(s) that can be scraped for information",
+        default=(os.getenv("SCRAPABLE_URL").split(",") if os.getenv("SCRAPABLE_URL") else None),
+        action="append",
+    )
+    ai.add_argument(
         "--no-tools",
         help="Do not use any tools via function calling",
         action="store_true",
@@ -93,6 +96,11 @@ def set_argparse():
             )
             else False
         ),
+    )
+    ai.add_argument(
+        "--system-prompt",
+        help="Prepend this to the message history sent to the LLM as a message from the system role",
+        default=os.getenv("SYSTEM_PROMPT") if os.getenv("SYSTEM_PROMPT") else None,
     )
 
     # Email arguments
@@ -180,6 +188,20 @@ def set_argparse():
                 os.getenv("SHOW_TOOL_CALLS")
                 and os.getenv("SHOW_TOOL_CALLS").lower() == "true"
                 and os.getenv("SHOW_TOOL_CALLS").lower() != "false"
+            )
+            else False
+        ),
+    )
+    debug.add_argument(
+        "--phidata-debug",
+        help="Pass debug=True to phidata",
+        action="store_true",
+        default=(
+            True
+            if (
+                os.getenv("PHIDATA_DEBUG")
+                and os.getenv("PHIDATA_DEBUG").lower() == "true"
+                and os.getenv("PHIDATA_DEBUG").lower() != "false"
             )
             else False
         ),

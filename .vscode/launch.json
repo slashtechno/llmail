@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug without args",
+            "name": "Debug with .env",
             "type": "debugpy",
             "request": "launch",
             "module": "llmail",
@@ -14,7 +14,7 @@
             "justMyCode": true
         },
         {
-            "name": "(Full) Debug without args",
+            "name": "(Full) Debug with .env",
             "type": "debugpy",
             "request": "launch",
             "module": "llmail",

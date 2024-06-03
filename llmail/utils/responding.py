@@ -12,6 +12,8 @@ from phi.tools.duckduckgo import DuckDuckGo
 from phi.llm.ollama import Ollama
 from phi.tools.exa import ExaTools
 from phi.tools.website import WebsiteTools
+from phi.knowledge.website import WebsiteKnowledgeBase
+from phi.knowledge.combined import CombinedKnowledgeBase
 import ollama
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
@@ -59,7 +61,7 @@ def fetch_and_process_emails(
                 ]
             )
             for msg_id in messages:
-                # It seems this will throw a KeyError if an email is sent while this for loop is running. However, I think the real cause is when an email is deleted (via another client) while testing the code
+                # If an email is deleted while the bot is running it will sometimes throw a key error
                 msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
@@ -162,12 +164,17 @@ def fetch_and_process_emails(
             else:
                 ValueError("Invalid email thread")
             # Select tools
+            website_knowledge_base = WebsiteKnowledgeBase(
+                urls=args.scrapable_url if args.scrapable_url else []
+            )
             tools = [
-                WebsiteTools(),
-                DuckDuckGo(search=True, news=True)
+                WebsiteTools(knowledge_base=website_knowledge_base),
+                DuckDuckGo(search=True, news=True),
             ]
             if args.exa_api_key is not None:
-                tools.append(ExaTools(api_key=args.exa_api_key, highlights=True))
+                tools.append(ExaTools(api_key=args.exa_api_key, highlights=True, num_results=10))
+                tools = [tool for tool in tools if not isinstance(tool, DuckDuckGo)]
+                logger.info("Removed DuckDuckGo from tools due to Exa being enabled")
             if args.no_tools:
                 tools = []
             # Chose how to send the request to the provider
@@ -202,8 +209,13 @@ def fetch_and_process_emails(
                 #     },
                 # ],
                 tool_call_limit=10,
-                debug_mode=False,
+                debug_mode=args.phidata_debug,
                 prevent_hallucinations=True,
+                knowledge_base=CombinedKnowledgeBase(
+                    sources=[
+                        website_knowledge_base,
+                    ]
+                ),
             )
             send_reply(
                 thread=tracking.get_thread_history(client, email_thread),

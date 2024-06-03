@@ -12,6 +12,10 @@ Interact with Large Language Models (LLMs) via email.
     - The default `docker-compose.yml` file uses `restart: unless-stopped` to ensure the container restarts after a reboot or if it crashes  
 - Check every _n_ seconds 
 - No need for a local database - uses IMAP
+- Use [phidata](https://github.com/phidatahq/phidata) for real-time information retrieval
+    <!-- - Websites to scrape can be configured with `--scrapable-url` (flag can be repeated to add multiple sites) or `SCRAPABLE_URL` in the `.env` file (multiple sites can be separated by commas)   -->
+    - Use [Exa](https://exa.ai/) or DuckDuckGo for searching the internet  
+    - Get information from a URL when requested and understand it when requested  
 
 ## Prerequisites  
 ### General
