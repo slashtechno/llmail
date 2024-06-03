@@ -6,7 +6,15 @@ from ssl import SSLError
 
 import yagmail
 from imapclient import IMAPClient
-from openai import OpenAI
+from phi.assistant import Assistant
+from phi.llm.openai.like import OpenAILike
+from phi.tools.duckduckgo import DuckDuckGo
+from phi.llm.ollama import Ollama
+from phi.tools.exa import ExaTools
+from phi.tools.website import WebsiteTools
+# from phi.knowledge.website import WebsiteKnowledgeBase
+# from phi.knowledge.combined import CombinedKnowledgeBase
+import ollama
 
 # Uses utils/__init__.py to import from utils/logging.py and utils/cli_args.py respectively
 from llmail.utils import logger, args, bot_email
@@ -27,7 +35,6 @@ def fetch_and_process_emails(
 ):
     """Fetch and process emails from the IMAP server."""
     global email_threads
-    openai = OpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
     with IMAPClient(args.imap_host) as client:
         client.login(args.imap_username, args.imap_password)
 
@@ -54,7 +61,7 @@ def fetch_and_process_emails(
                 ]
             )
             for msg_id in messages:
-                # It seems this will throw a KeyError if an email is sent while this for loop is running. However, I think the real cause is when an email is deleted (via another client) while testing the code
+                # If an email is deleted while the bot is running it will sometimes throw a key error
                 msg_data = client.fetch([msg_id], ["ENVELOPE", "BODY[]", "RFC822.HEADER"])
                 envelope = msg_data[msg_id][b"ENVELOPE"]
                 subject = envelope.subject.decode()
@@ -156,6 +163,62 @@ def fetch_and_process_emails(
                 continue
             else:
                 ValueError("Invalid email thread")
+            # Select tools
+            # website_knowledge_base = WebsiteKnowledgeBase(
+            #     urls=args.scrapable_url if args.scrapable_url else []
+            # )
+            tools = [
+                # Giving WebsiteTools the knowledge base seems to allow it to add URLs to the knowledge base
+                # WebsiteTools(knowledge_base=website_knowledge_base),
+                WebsiteTools(),
+                DuckDuckGo(search=True, news=True),
+            ]
+            if args.exa_api_key is not None:
+                tools.append(ExaTools(api_key=args.exa_api_key, highlights=True, num_results=10))
+                tools = [tool for tool in tools if not isinstance(tool, DuckDuckGo)]
+                logger.info("Removed DuckDuckGo from tools due to Exa being enabled")
+            if args.no_tools:
+                tools = []
+            # Chose how to send the request to the provider
+            match args.llm_provider:
+                case "openai-like":
+                    llm = OpenAILike(
+                        model=args.llm_model,
+                        api_key=args.llm_api_key,
+                        base_url=args.llm_base_url,
+                    )
+                case "ollama":
+                    ollama_client = ollama.Client(host=args.llm_base_url)
+                    for model in ollama_client.list()["models"]:
+                        if model["name"] == args.llm_model:
+                            logger.debug(f"{args.llm_model} is already downloaded")
+                            break
+                    else:
+                        logger.info(f"Downloading {args.llm_model}")
+                        ollama_client.pull(model=args.llm_model)
+                    llm = Ollama(
+                        model=args.llm_model,
+                        host=args.llm_base_url,
+                    )
+            assistant = Assistant(
+                llm=llm,
+                tools=tools,
+                show_tool_calls=args.show_tool_calls,
+                # additional_messages=[
+                #     {
+                #         "role": "system",
+                #         "content": "Functions generally need arguments. Only provide your final iteration to the user. For example, if you're searching for a website, don't tell the user that you're searching for the website. Just provide the final result. Remember, the user is only going to see the final response, not the steps you took to get there. Only provide the final result. Try to use the most appropriate tool for the task. For example, if the user asks about a website, try searching for it and scraping it too. For URLs, ensure the protocol is included (e.g. https://). Use the functions to ensure that the information is accurate and up-to-date",
+                #     },
+                # ],
+                tool_call_limit=10,
+                debug_mode=args.phidata_debug,
+                prevent_hallucinations=True,
+                # knowledge_base=CombinedKnowledgeBase(
+                #     sources=[
+                #         website_knowledge_base,
+                #     ]
+                # ),
+            )
             send_reply(
                 thread=tracking.get_thread_history(client, email_thread),
                 subject=subject,
@@ -164,9 +227,8 @@ def fetch_and_process_emails(
                 msg_id=msg_id,
                 message_id=message_id,
                 references_ids=references_ids,
-                openai=openai,
+                assistant=assistant,
                 system_prompt=system_prompt,
-                model=args.openai_model,
             )
 
         logger.info(f"Current number of email threads: {len(email_threads.keys())}")
@@ -180,9 +242,8 @@ def send_reply(
     msg_id: int,
     message_id: str,
     references_ids: list[str],
-    openai: OpenAI,
+    assistant: Assistant,
     system_prompt: str,
-    model: str,
 ):
     """Send a reply to the email with the specified message ID."""
     # Set roles deletes the sender key so we need to store the sender before calling it
@@ -191,14 +252,7 @@ def send_reply(
     if system_prompt:
         thread.insert(0, {"role": "system", "content": system_prompt})
     references_ids.append(message_id)
-    generated_response = (
-        openai.chat.completions.create(
-            model=model,
-            messages=thread,
-        )
-        .choices[0]
-        .message.content
-    )
+    generated_response = assistant.run(messages=thread, stream=False)
     logger.debug(f"Generated response: {generated_response}")
     yag = yagmail.SMTP(
         user={args.smtp_username: alias} if alias else args.smtp_username,

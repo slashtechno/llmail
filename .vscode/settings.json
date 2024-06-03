@@ -2,5 +2,8 @@
     "files.eol": "\n",
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "files.exclude": {
+        "**/.venv": true
     }
 }

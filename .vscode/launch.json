@@ -5,13 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug without args",
+            "name": "Debug with .env",
             "type": "debugpy",
             "request": "launch",
             "module": "llmail",
             "args": [
             ],
             "justMyCode": true
+        },
+        {
+            "name": "(Full) Debug with .env",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "llmail",
+            "args": [
+            ],
+            "justMyCode": false
         },
         {
             "name": "Debug with custom folder",
